@@ -15,6 +15,7 @@ import com.facebook.common.internal.Suppliers;
 import com.facebook.common.memory.ByteArrayPool;
 import com.facebook.common.memory.PooledByteBuffer;
 import com.facebook.common.memory.PooledByteBufferFactory;
+import com.facebook.common.memory.PooledByteStreams;
 import com.facebook.common.webp.WebpBitmapFactory;
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory;
 import com.facebook.imagepipeline.cache.BufferedDiskCache;
@@ -61,6 +62,8 @@ public class ImagePipelineExperiments {
   private final boolean mIsEncodedMemoryCacheProbingEnabled;
   private final boolean mIsDiskCacheProbingEnabled;
   private final int mTrackedKeysSize;
+  private final boolean mUseCombinedNetworkAndCacheProducer;
+  private final boolean mAllowDelay;
 
   private ImagePipelineExperiments(Builder builder) {
     mWebpSupportEnabled = builder.mWebpSupportEnabled;
@@ -94,6 +97,8 @@ public class ImagePipelineExperiments {
     mIsEncodedMemoryCacheProbingEnabled = builder.mIsEncodedMemoryCacheProbingEnabled;
     mIsDiskCacheProbingEnabled = builder.mIsDiskCacheProbingEnabled;
     mTrackedKeysSize = builder.mTrackedKeysSize;
+    mUseCombinedNetworkAndCacheProducer = builder.mUseCombinedNetworkAndCacheProducer;
+    mAllowDelay = builder.mAllowDelay;
   }
 
   public boolean isEncodedCacheEnabled() {
@@ -209,6 +214,14 @@ public class ImagePipelineExperiments {
     return mKeepCancelledFetchAsLowPriority;
   }
 
+  public boolean shouldUseCombinedNetworkAndCacheProducer() {
+    return mUseCombinedNetworkAndCacheProducer;
+  }
+
+  public boolean allowDelay() {
+    return mAllowDelay;
+  }
+
   public static class Builder {
 
     private final ImagePipelineConfig.Builder mConfigBuilder;
@@ -239,6 +252,8 @@ public class ImagePipelineExperiments {
     private boolean mIsEncodedMemoryCacheProbingEnabled = false;
     private boolean mIsDiskCacheProbingEnabled = false;
     private int mTrackedKeysSize = 20;
+    private boolean mUseCombinedNetworkAndCacheProducer = false;
+    private boolean mAllowDelay = false;
 
     public Builder(ImagePipelineConfig.Builder configBuilder) {
       mConfigBuilder = configBuilder;
@@ -426,6 +441,17 @@ public class ImagePipelineExperiments {
       return mConfigBuilder;
     }
 
+    public ImagePipelineConfig.Builder setUseCombinedNetworkAndCacheProducer(
+        boolean useCombinedNetworkAndCacheProducer) {
+      mUseCombinedNetworkAndCacheProducer = useCombinedNetworkAndCacheProducer;
+      return mConfigBuilder;
+    }
+
+    public ImagePipelineConfig.Builder setAllowDelay(boolean allowDelay) {
+      mAllowDelay = allowDelay;
+      return mConfigBuilder;
+    }
+
     public ImagePipelineExperiments build() {
       return new ImagePipelineExperiments(this);
     }
@@ -443,6 +469,7 @@ public class ImagePipelineExperiments {
         boolean decodeCancellationEnabled,
         ExecutorSupplier executorSupplier,
         PooledByteBufferFactory pooledByteBufferFactory,
+        PooledByteStreams pooledByteStreams,
         MemoryCache<CacheKey, CloseableImage> bitmapMemoryCache,
         MemoryCache<CacheKey, PooledByteBuffer> encodedMemoryCache,
         BufferedDiskCache defaultBufferedDiskCache,
@@ -471,6 +498,7 @@ public class ImagePipelineExperiments {
         boolean decodeCancellationEnabled,
         ExecutorSupplier executorSupplier,
         PooledByteBufferFactory pooledByteBufferFactory,
+        PooledByteStreams pooledByteStreams,
         MemoryCache<CacheKey, CloseableImage> bitmapMemoryCache,
         MemoryCache<CacheKey, PooledByteBuffer> encodedMemoryCache,
         BufferedDiskCache defaultBufferedDiskCache,

@@ -11,6 +11,7 @@ import com.facebook.common.internal.ByteStreams;
 import com.facebook.common.internal.Closeables;
 import com.facebook.common.internal.Preconditions;
 import com.facebook.common.internal.Throwables;
+import com.facebook.infer.annotation.Nullsafe;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +19,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /** Detects the format of an encoded image. */
+@Nullsafe(Nullsafe.Mode.STRICT)
 public class ImageFormatChecker {
 
   private static ImageFormatChecker sInstance;
@@ -26,10 +28,14 @@ public class ImageFormatChecker {
 
   @Nullable private List<ImageFormat.FormatChecker> mCustomImageFormatCheckers;
 
-  private final ImageFormat.FormatChecker mDefaultFormatChecker = new DefaultImageFormatChecker();
+  private final DefaultImageFormatChecker mDefaultFormatChecker = new DefaultImageFormatChecker();
 
   private ImageFormatChecker() {
     updateMaxHeaderLength();
+  }
+
+  public void setUseNewOrder(boolean useNewOrder) {
+    mDefaultFormatChecker.setUseNewOrder(useNewOrder);
   }
 
   public void setCustomImageFormatCheckers(

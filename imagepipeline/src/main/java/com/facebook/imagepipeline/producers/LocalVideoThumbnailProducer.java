@@ -17,8 +17,8 @@ import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import androidx.annotation.VisibleForTesting;
 import com.facebook.common.internal.ImmutableMap;
-import com.facebook.common.internal.VisibleForTesting;
 import com.facebook.common.references.CloseableReference;
 import com.facebook.common.util.UriUtil;
 import com.facebook.imagepipeline.bitmaps.SimpleBitmapReleaser;
@@ -100,7 +100,7 @@ public class LocalVideoThumbnailProducer implements Producer<CloseableReference<
                     SimpleBitmapReleaser.getInstance(),
                     ImmutableQualityInfo.FULL_QUALITY,
                     0);
-            producerContext.setExtra("image_format", "thumbnail");
+            producerContext.setExtra(ProducerContext.ExtraKeys.IMAGE_FORMAT, "thumbnail");
             closeableStaticBitmap.setImageExtras(producerContext.getExtras());
             return CloseableReference.<CloseableImage>of(closeableStaticBitmap);
           }

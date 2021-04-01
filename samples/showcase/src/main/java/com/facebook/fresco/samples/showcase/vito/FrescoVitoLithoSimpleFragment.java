@@ -31,6 +31,7 @@ public class FrescoVitoLithoSimpleFragment extends BaseShowcaseFragment {
       ImageOptions.create()
           .placeholderRes(R.drawable.logo)
           .round(RoundingOptions.asCircle())
+          .fadeDurationMs(3000)
           .build();
 
   @Nullable
@@ -48,11 +49,6 @@ public class FrescoVitoLithoSimpleFragment extends BaseShowcaseFragment {
 
     FrameLayout container = view.findViewById(R.id.container);
     container.addView(LithoView.create(componentContext, createComponent(componentContext)));
-  }
-
-  @Override
-  public int getTitleId() {
-    return R.string.vito_litho_simple;
   }
 
   public Component createComponent(ComponentContext c) {

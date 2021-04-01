@@ -11,12 +11,13 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Build;
+import androidx.annotation.VisibleForTesting;
 import com.facebook.cache.common.CacheKey;
 import com.facebook.cache.disk.DiskCacheConfig;
 import com.facebook.callercontext.CallerContextVerifier;
+import com.facebook.common.executors.SerialExecutorService;
 import com.facebook.common.internal.Preconditions;
 import com.facebook.common.internal.Supplier;
-import com.facebook.common.internal.VisibleForTesting;
 import com.facebook.common.memory.MemoryTrimmableRegistry;
 import com.facebook.common.memory.NoOpMemoryTrimmableRegistry;
 import com.facebook.common.memory.PooledByteBuffer;
@@ -25,8 +26,10 @@ import com.facebook.common.webp.WebpBitmapFactory;
 import com.facebook.common.webp.WebpSupportStatus;
 import com.facebook.imagepipeline.bitmaps.HoneycombBitmapCreator;
 import com.facebook.imagepipeline.bitmaps.PlatformBitmapFactory;
+import com.facebook.imagepipeline.cache.BitmapMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.BitmapMemoryCacheTrimStrategy;
 import com.facebook.imagepipeline.cache.CacheKeyFactory;
+import com.facebook.imagepipeline.cache.CountingLruBitmapMemoryCacheFactory;
 import com.facebook.imagepipeline.cache.CountingMemoryCache;
 import com.facebook.imagepipeline.cache.DefaultBitmapMemoryCacheParamsSupplier;
 import com.facebook.imagepipeline.cache.DefaultCacheKeyFactory;
@@ -69,16 +72,19 @@ import javax.annotation.Nullable;
  *
  * <p>This should only be done once per process.
  */
-public class ImagePipelineConfig {
+public class ImagePipelineConfig implements ImagePipelineConfigInterface {
   // If a member here is marked @Nullable, it must be constructed by ImagePipelineFactory
   // on demand if needed.
 
   // There are a lot of parameters in this class. Please follow strict alphabetical order.
   private final Bitmap.Config mBitmapConfig;
   private final Supplier<MemoryCacheParams> mBitmapMemoryCacheParamsSupplier;
-  private final CountingMemoryCache.CacheTrimStrategy mBitmapMemoryCacheTrimStrategy;
+  private final MemoryCache.CacheTrimStrategy mBitmapMemoryCacheTrimStrategy;
+
+  @Nullable
   private final CountingMemoryCache.EntryStateObserver<CacheKey>
       mBitmapMemoryCacheEntryStateObserver;
+
   private final CacheKeyFactory mCacheKeyFactory;
   private final Context mContext;
   private final boolean mDownsampleEnabled;
@@ -109,6 +115,8 @@ public class ImagePipelineConfig {
   private final CloseableReferenceLeakTracker mCloseableReferenceLeakTracker;
   @Nullable private final MemoryCache<CacheKey, CloseableImage> mBitmapCache;
   @Nullable private final MemoryCache<CacheKey, PooledByteBuffer> mEncodedMemoryCache;
+  @Nullable private final SerialExecutorService mSerialExecutorServiceForAnimatedImages;
+  private final BitmapMemoryCacheFactory mBitmapMemoryCacheFactory;
 
   private static DefaultImageRequestConfig sDefaultImageRequestConfig =
       new DefaultImageRequestConfig();
@@ -216,7 +224,12 @@ public class ImagePipelineConfig {
     mCallerContextVerifier = builder.mCallerContextVerifier;
     mCloseableReferenceLeakTracker = builder.mCloseableReferenceLeakTracker;
     mBitmapCache = builder.mBitmapMemoryCache;
+    mBitmapMemoryCacheFactory =
+        builder.mBitmapMemoryCacheFactory == null
+            ? new CountingLruBitmapMemoryCacheFactory()
+            : builder.mBitmapMemoryCacheFactory;
     mEncodedMemoryCache = builder.mEncodedMemoryCache;
+    mSerialExecutorServiceForAnimatedImages = builder.mSerialExecutorServiceForAnimatedImages;
     // Here we manage the WebpBitmapFactory implementation if any
     WebpBitmapFactory webpBitmapFactory = mImagePipelineExperiments.getWebpBitmapFactory();
     if (webpBitmapFactory != null) {
@@ -271,26 +284,33 @@ public class ImagePipelineConfig {
     sDefaultImageRequestConfig = new DefaultImageRequestConfig();
   }
 
+  @Override
   public Bitmap.Config getBitmapConfig() {
     return mBitmapConfig;
   }
 
+  @Override
   public Supplier<MemoryCacheParams> getBitmapMemoryCacheParamsSupplier() {
     return mBitmapMemoryCacheParamsSupplier;
   }
 
-  public CountingMemoryCache.CacheTrimStrategy getBitmapMemoryCacheTrimStrategy() {
+  @Override
+  public MemoryCache.CacheTrimStrategy getBitmapMemoryCacheTrimStrategy() {
     return mBitmapMemoryCacheTrimStrategy;
   }
 
+  @Override
+  @Nullable
   public CountingMemoryCache.EntryStateObserver<CacheKey> getBitmapMemoryCacheEntryStateObserver() {
     return mBitmapMemoryCacheEntryStateObserver;
   }
 
+  @Override
   public CacheKeyFactory getCacheKeyFactory() {
     return mCacheKeyFactory;
   }
 
+  @Override
   public Context getContext() {
     return mContext;
   }
@@ -299,110 +319,141 @@ public class ImagePipelineConfig {
     return sDefaultImageRequestConfig;
   }
 
+  @Override
   public FileCacheFactory getFileCacheFactory() {
     return mFileCacheFactory;
   }
 
+  @Override
   public boolean isDownsampleEnabled() {
     return mDownsampleEnabled;
   }
 
+  @Override
   public boolean isDiskCacheEnabled() {
     return mDiskCacheEnabled;
   }
 
+  @Override
   public Supplier<MemoryCacheParams> getEncodedMemoryCacheParamsSupplier() {
     return mEncodedMemoryCacheParamsSupplier;
   }
 
+  @Override
   public ExecutorSupplier getExecutorSupplier() {
     return mExecutorSupplier;
   }
 
+  @Override
+  @Nullable
+  public SerialExecutorService getExecutorServiceForAnimatedImages() {
+    return mSerialExecutorServiceForAnimatedImages;
+  }
+
+  @Override
   public ImageCacheStatsTracker getImageCacheStatsTracker() {
     return mImageCacheStatsTracker;
   }
 
+  @Override
   @Nullable
   public ImageDecoder getImageDecoder() {
     return mImageDecoder;
   }
 
+  @Override
   @Nullable
   public ImageTranscoderFactory getImageTranscoderFactory() {
     return mImageTranscoderFactory;
   }
 
+  @Override
   @Nullable
   @ImageTranscoderType
   public Integer getImageTranscoderType() {
     return mImageTranscoderType;
   }
 
+  @Override
   public Supplier<Boolean> getIsPrefetchEnabledSupplier() {
     return mIsPrefetchEnabledSupplier;
   }
 
+  @Override
   public DiskCacheConfig getMainDiskCacheConfig() {
     return mMainDiskCacheConfig;
   }
 
+  @Override
   public MemoryTrimmableRegistry getMemoryTrimmableRegistry() {
     return mMemoryTrimmableRegistry;
   }
 
+  @Override
   @MemoryChunkType
   public int getMemoryChunkType() {
     return mMemoryChunkType;
   }
 
+  @Override
   public NetworkFetcher getNetworkFetcher() {
     return mNetworkFetcher;
   }
 
+  @Override
   @Nullable
   public PlatformBitmapFactory getPlatformBitmapFactory() {
     return mPlatformBitmapFactory;
   }
 
+  @Override
   public PoolFactory getPoolFactory() {
     return mPoolFactory;
   }
 
+  @Override
   public ProgressiveJpegConfig getProgressiveJpegConfig() {
     return mProgressiveJpegConfig;
   }
 
+  @Override
   public Set<RequestListener> getRequestListeners() {
     return Collections.unmodifiableSet(mRequestListeners);
   }
 
+  @Override
   public Set<RequestListener2> getRequestListener2s() {
     return Collections.unmodifiableSet(mRequestListener2s);
   }
 
+  @Override
   public boolean isResizeAndRotateEnabledForNetwork() {
     return mResizeAndRotateEnabledForNetwork;
   }
 
+  @Override
   public DiskCacheConfig getSmallImageDiskCacheConfig() {
     return mSmallImageDiskCacheConfig;
   }
 
+  @Override
   @Nullable
   public ImageDecoderConfig getImageDecoderConfig() {
     return mImageDecoderConfig;
   }
 
+  @Override
   @Nullable
   public CallerContextVerifier getCallerContextVerifier() {
     return mCallerContextVerifier;
   }
 
+  @Override
   public ImagePipelineExperiments getExperiments() {
     return mImagePipelineExperiments;
   }
 
+  @Override
   public CloseableReferenceLeakTracker getCloseableReferenceLeakTracker() {
     return mCloseableReferenceLeakTracker;
   }
@@ -441,14 +492,21 @@ public class ImagePipelineConfig {
     }
   }
 
+  @Override
   @Nullable
   public MemoryCache<CacheKey, CloseableImage> getBitmapCacheOverride() {
     return mBitmapCache;
   }
 
+  @Override
   @Nullable
   public MemoryCache<CacheKey, PooledByteBuffer> getEncodedMemoryCacheOverride() {
     return mEncodedMemoryCache;
+  }
+
+  @Override
+  public BitmapMemoryCacheFactory getBitmapMemoryCacheFactory() {
+    return mBitmapMemoryCacheFactory;
   }
 
   /** Contains default configuration that can be personalized for all the request */
@@ -469,42 +527,47 @@ public class ImagePipelineConfig {
 
   public static class Builder {
 
-    private Bitmap.Config mBitmapConfig;
-    private Supplier<MemoryCacheParams> mBitmapMemoryCacheParamsSupplier;
+    @Nullable private Bitmap.Config mBitmapConfig;
+    @Nullable private Supplier<MemoryCacheParams> mBitmapMemoryCacheParamsSupplier;
+
+    @Nullable
     private CountingMemoryCache.EntryStateObserver<CacheKey> mBitmapMemoryCacheEntryStateObserver;
-    private CountingMemoryCache.CacheTrimStrategy mBitmapMemoryCacheTrimStrategy;
-    private CacheKeyFactory mCacheKeyFactory;
+
+    @Nullable private MemoryCache.CacheTrimStrategy mBitmapMemoryCacheTrimStrategy;
+    @Nullable private CacheKeyFactory mCacheKeyFactory;
     private final Context mContext;
     private boolean mDownsampleEnabled = false;
-    private Supplier<MemoryCacheParams> mEncodedMemoryCacheParamsSupplier;
-    private ExecutorSupplier mExecutorSupplier;
-    private ImageCacheStatsTracker mImageCacheStatsTracker;
-    private ImageDecoder mImageDecoder;
-    private ImageTranscoderFactory mImageTranscoderFactory;
+    @Nullable private Supplier<MemoryCacheParams> mEncodedMemoryCacheParamsSupplier;
+    @Nullable private ExecutorSupplier mExecutorSupplier;
+    @Nullable private ImageCacheStatsTracker mImageCacheStatsTracker;
+    @Nullable private ImageDecoder mImageDecoder;
+    @Nullable private ImageTranscoderFactory mImageTranscoderFactory;
     @Nullable @ImageTranscoderType private Integer mImageTranscoderType = null;
-    private Supplier<Boolean> mIsPrefetchEnabledSupplier;
-    private DiskCacheConfig mMainDiskCacheConfig;
-    private MemoryTrimmableRegistry mMemoryTrimmableRegistry;
+    @Nullable private Supplier<Boolean> mIsPrefetchEnabledSupplier;
+    @Nullable private DiskCacheConfig mMainDiskCacheConfig;
+    @Nullable private MemoryTrimmableRegistry mMemoryTrimmableRegistry;
     @Nullable @MemoryChunkType private Integer mMemoryChunkType = null;
-    private NetworkFetcher mNetworkFetcher;
-    private PlatformBitmapFactory mPlatformBitmapFactory;
-    private PoolFactory mPoolFactory;
-    private ProgressiveJpegConfig mProgressiveJpegConfig;
-    private Set<RequestListener> mRequestListeners;
-    private Set<RequestListener2> mRequestListener2s;
+    @Nullable private NetworkFetcher mNetworkFetcher;
+    @Nullable private PlatformBitmapFactory mPlatformBitmapFactory;
+    @Nullable private PoolFactory mPoolFactory;
+    @Nullable private ProgressiveJpegConfig mProgressiveJpegConfig;
+    @Nullable private Set<RequestListener> mRequestListeners;
+    @Nullable private Set<RequestListener2> mRequestListener2s;
     private boolean mResizeAndRotateEnabledForNetwork = true;
-    private DiskCacheConfig mSmallImageDiskCacheConfig;
-    private FileCacheFactory mFileCacheFactory;
-    private ImageDecoderConfig mImageDecoderConfig;
+    @Nullable private DiskCacheConfig mSmallImageDiskCacheConfig;
+    @Nullable private FileCacheFactory mFileCacheFactory;
+    @Nullable private ImageDecoderConfig mImageDecoderConfig;
     private int mHttpConnectionTimeout = -1;
     private final ImagePipelineExperiments.Builder mExperimentsBuilder =
         new ImagePipelineExperiments.Builder(this);
     private boolean mDiskCacheEnabled = true;
-    private CallerContextVerifier mCallerContextVerifier;
+    @Nullable private CallerContextVerifier mCallerContextVerifier;
     private CloseableReferenceLeakTracker mCloseableReferenceLeakTracker =
         new NoOpCloseableReferenceLeakTracker();
     @Nullable private MemoryCache<CacheKey, CloseableImage> mBitmapMemoryCache;
     @Nullable private MemoryCache<CacheKey, PooledByteBuffer> mEncodedMemoryCache;
+    @Nullable private SerialExecutorService mSerialExecutorServiceForAnimatedImages;
+    @Nullable private BitmapMemoryCacheFactory mBitmapMemoryCacheFactory;
 
     private Builder(Context context) {
       // Doesn't use a setter as always required.
@@ -697,6 +760,23 @@ public class ImagePipelineConfig {
         @Nullable MemoryCache<CacheKey, PooledByteBuffer> encodedMemoryCache) {
       mEncodedMemoryCache = encodedMemoryCache;
       return this;
+    }
+
+    public Builder setExecutorServiceForAnimatedImages(
+        @Nullable SerialExecutorService serialExecutorService) {
+      mSerialExecutorServiceForAnimatedImages = serialExecutorService;
+      return this;
+    }
+
+    public Builder setBitmapMemoryCacheFactory(
+        @Nullable BitmapMemoryCacheFactory bitmapMemoryCacheFactory) {
+      mBitmapMemoryCacheFactory = bitmapMemoryCacheFactory;
+      return this;
+    }
+
+    @Nullable
+    public BitmapMemoryCacheFactory getBitmapMemoryCacheFactory() {
+      return mBitmapMemoryCacheFactory;
     }
 
     public ImagePipelineExperiments.Builder experiment() {

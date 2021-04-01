@@ -8,9 +8,9 @@
 package com.facebook.fresco.vito.core.impl;
 
 import android.net.Uri;
-import com.facebook.common.internal.VisibleForTesting;
+import androidx.annotation.VisibleForTesting;
+import com.facebook.common.internal.Supplier;
 import com.facebook.common.logging.FLog;
-import com.facebook.fresco.vito.core.FrescoExperiments;
 import com.facebook.fresco.vito.core.ImagePipelineUtils;
 import com.facebook.fresco.vito.options.DecodedImageOptions;
 import com.facebook.fresco.vito.options.EncodedImageOptions;
@@ -22,6 +22,7 @@ import com.facebook.imagepipeline.common.RotationOptions;
 import com.facebook.imagepipeline.core.NativeCodeSetup;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.ImageRequestBuilder;
+import com.facebook.imagepipeline.request.Postprocessor;
 import javax.annotation.Nullable;
 
 /**
@@ -32,13 +33,16 @@ public class ImagePipelineUtilsImpl implements ImagePipelineUtils {
 
   private static final String TAG = "ImagePipelineUtils";
 
-  private final FrescoExperiments mExperiments;
+  private final Supplier<Boolean> mUseNativeRounding;
+  private final Supplier<Boolean> mUseFastNativeRounding;
 
   private @Nullable ImageDecodeOptions mCircularImageDecodeOptions;
   private @Nullable ImageDecodeOptions mCircularImageDecodeOptionsAntiAliased;
 
-  public ImagePipelineUtilsImpl(FrescoExperiments frescoExperiments) {
-    mExperiments = frescoExperiments;
+  public ImagePipelineUtilsImpl(
+      Supplier<Boolean> useNativeRounding, Supplier<Boolean> useFastNativeRounding) {
+    mUseNativeRounding = useNativeRounding;
+    mUseFastNativeRounding = useFastNativeRounding;
   }
 
   @Override
@@ -79,7 +83,10 @@ public class ImagePipelineUtilsImpl implements ImagePipelineUtils {
       return null;
     }
 
-    if (mExperiments.useNativeRounding() && NativeCodeSetup.getUseNativeCode()) {
+    RoundingOptions roundingOptions = imageOptions.getRoundingOptions();
+    boolean forceRoundAtDecode = roundingOptions != null && roundingOptions.isForceRoundAtDecode();
+
+    if ((!forceRoundAtDecode && mUseNativeRounding.get()) && NativeCodeSetup.getUseNativeCode()) {
       setupNativeRounding(imageRequestBuilder, imageOptions.getRoundingOptions());
     }
 
@@ -117,9 +124,10 @@ public class ImagePipelineUtilsImpl implements ImagePipelineUtils {
     imageRequestBuilder.setLocalThumbnailPreviewsEnabled(
         imageOptions.areLocalThumbnailPreviewsEnabled());
 
-    imageRequestBuilder.setShouldDecodePrefetches(mExperiments.prefetchToBitmapCache());
-
-    imageRequestBuilder.setPostprocessor(imageOptions.getPostprocessor());
+    Postprocessor postprocessor = imageOptions.getPostprocessor();
+    if (postprocessor != null) {
+      imageRequestBuilder.setPostprocessor(postprocessor);
+    }
 
     return imageRequestBuilder;
   }
@@ -157,13 +165,12 @@ public class ImagePipelineUtilsImpl implements ImagePipelineUtils {
   }
 
   private synchronized ImageDecodeOptions getCircularImageDecodeOptions(boolean antiAliased) {
-    final boolean useFastNativeRounding = mExperiments.useFastNativeRounding();
     if (antiAliased) {
       if (mCircularImageDecodeOptionsAntiAliased == null) {
         mCircularImageDecodeOptionsAntiAliased =
             ImageDecodeOptions.newBuilder()
                 .setBitmapTransformation(
-                    new CircularBitmapTransformation(true, useFastNativeRounding))
+                    new CircularBitmapTransformation(true, mUseFastNativeRounding.get()))
                 .build();
       }
       return mCircularImageDecodeOptionsAntiAliased;
@@ -172,7 +179,7 @@ public class ImagePipelineUtilsImpl implements ImagePipelineUtils {
         mCircularImageDecodeOptions =
             ImageDecodeOptions.newBuilder()
                 .setBitmapTransformation(
-                    new CircularBitmapTransformation(false, useFastNativeRounding))
+                    new CircularBitmapTransformation(false, mUseFastNativeRounding.get()))
                 .build();
       }
       return mCircularImageDecodeOptions;

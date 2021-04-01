@@ -11,8 +11,10 @@ import android.graphics.drawable.Drawable;
 import com.facebook.drawee.backends.pipeline.info.ImageOrigin;
 import com.facebook.fresco.ui.common.DimensionsInfo;
 import com.facebook.imagepipeline.image.ImageInfo;
+import com.facebook.infer.annotation.Nullsafe;
 import javax.annotation.Nullable;
 
+@Nullsafe(Nullsafe.Mode.STRICT)
 public class ForwardingImageListener implements ImageListener {
 
   @Nullable
@@ -48,7 +50,7 @@ public class ForwardingImageListener implements ImageListener {
   }
 
   @Override
-  public void onSubmit(long id, Object callerContext) {
+  public void onSubmit(long id, @Nullable Object callerContext) {
     for (int i = 0; i < mListeners.length; i++) {
       if (mListeners[i] != null) {
         mListeners[i].onSubmit(id, callerContext);
@@ -88,7 +90,7 @@ public class ForwardingImageListener implements ImageListener {
   }
 
   @Override
-  public void onIntermediateImageFailed(long id, Throwable throwable) {
+  public void onIntermediateImageFailed(long id, @Nullable Throwable throwable) {
     for (int i = 0; i < mListeners.length; i++) {
       if (mListeners[i] != null) {
         mListeners[i].onIntermediateImageFailed(id, throwable);

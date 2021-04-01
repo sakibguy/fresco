@@ -12,10 +12,11 @@ apply plugin: 'com.android.library'
 apply plugin: 'maven'
 
 dependencies {
+    compileOnly Deps.inferAnnotation
     compileOnly Deps.jsr305
     compileOnly Deps.javaxAnnotation
 
-    implementation "androidx.core:core:${versions.androidx.core}"
+    implementation Deps.AndroidX.core
     implementation Deps.Litho.lithoAnnotations
     implementation Deps.Litho.core
     implementation Deps.Litho.widget
@@ -31,9 +32,9 @@ dependencies {
     implementation project(':vito:source')
 
     testImplementation TestDeps.junit
-    testImplementation "org.assertj:assertj-core:${versions.assertjCore}"
-    testImplementation "org.mockito:mockito-core:${MOCKITO_CORE_VERSION}"
-    testImplementation("org.robolectric:robolectric:${ROBOLECTRIC_VERSION}") {
+    testImplementation TestDeps.assertjCore
+    testImplementation TestDeps.mockitoCore
+    testImplementation(TestDeps.robolectric) {
         exclude group: 'commons-logging', module: 'commons-logging'
         exclude group: 'org.apache.httpcomponents', module: 'httpclient'
     }

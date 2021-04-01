@@ -14,7 +14,12 @@ import com.facebook.fresco.vito.view.VitoView
 
 object ViewExtensions {
 
-    fun View.show(uri: Uri) = VitoView.show(uri, this)
+  fun View.show(uri: Uri) = VitoView.show(uri, this)
 
-    fun View.show(uri: Uri, imageOptions: ImageOptions) = VitoView.show(uri, imageOptions, this)
+  fun View.show(uri: Uri, callerContext: Any) = VitoView.show(uri, callerContext, this)
+
+  fun View.show(uri: Uri, imageOptions: ImageOptions) = VitoView.show(uri, imageOptions, this)
+
+  fun View.show(uri: Uri, imageOptions: ImageOptions, callerContext: Any) =
+      VitoView.show(uri, imageOptions, callerContext, this)
 }

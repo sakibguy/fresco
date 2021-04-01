@@ -15,9 +15,10 @@ import com.facebook.fresco.vito.listener.ImageListener;
 import com.facebook.fresco.vito.options.ImageOptions;
 import com.facebook.fresco.vito.source.ImageSource;
 import com.facebook.fresco.vito.source.ImageSourceProvider;
+import com.facebook.infer.annotation.Nullsafe;
 
 /** You must initialize this class before use by calling {@link #init(Implementation)}. */
-@Deprecated /* Experimental */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class VitoView {
 
   public interface Implementation {
@@ -54,10 +55,24 @@ public class VitoView {
   }
 
   /*
+   * Display an image with default image options and a caller context.
+   */
+  public static void show(@Nullable Uri uri, Object callerContext, View target) {
+    show(ImageSourceProvider.forUri(uri), callerContext, target);
+  }
+
+  /*
    * Display an image with default image options
    */
   public static void show(ImageSource imageSource, View target) {
     sImplementation.show(imageSource, ImageOptions.defaults(), null, null, target);
+  }
+
+  /*
+   * Display an image with default image options and a caller context.
+   */
+  public static void show(ImageSource imageSource, Object callerContext, View target) {
+    sImplementation.show(imageSource, ImageOptions.defaults(), callerContext, null, target);
   }
 
   /*

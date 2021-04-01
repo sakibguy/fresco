@@ -7,6 +7,13 @@
 
 package com.facebook.fresco.vito.core;
 
+import com.facebook.common.internal.Supplier;
+import com.facebook.common.internal.Suppliers;
+import com.facebook.infer.annotation.Nullsafe;
+import com.facebook.infer.annotation.OkToExtend;
+
+@Nullsafe(Nullsafe.Mode.STRICT)
+@OkToExtend
 public class DefaultFrescoVitoConfig implements FrescoVitoConfig {
 
   private final PrefetchConfig mPrefetchConfig = new DefaultPrefetchConfig();
@@ -19,6 +26,21 @@ public class DefaultFrescoVitoConfig implements FrescoVitoConfig {
   @Override
   public boolean submitFetchOnBgThread() {
     return true;
+  }
+
+  @Override
+  public boolean useBindOnly() {
+    return false;
+  }
+
+  @Override
+  public boolean useNewReleaseCallback() {
+    return false;
+  }
+
+  @Override
+  public Supplier<Boolean> useNativeRounding() {
+    return Suppliers.BOOLEAN_TRUE;
   }
 
   public static class DefaultPrefetchConfig implements PrefetchConfig {

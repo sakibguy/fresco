@@ -11,6 +11,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import androidx.annotation.Nullable;
 import com.facebook.cache.common.CacheKey;
 import com.facebook.common.internal.Suppliers;
 import com.facebook.common.memory.ByteArrayPool;
@@ -35,6 +36,7 @@ import com.facebook.imagepipeline.producers.BitmapProbeProducer;
 import com.facebook.imagepipeline.producers.BranchOnSeparateImagesProducer;
 import com.facebook.imagepipeline.producers.DataFetchProducer;
 import com.facebook.imagepipeline.producers.DecodeProducer;
+import com.facebook.imagepipeline.producers.DelayProducer;
 import com.facebook.imagepipeline.producers.DiskCacheReadProducer;
 import com.facebook.imagepipeline.producers.DiskCacheWriteProducer;
 import com.facebook.imagepipeline.producers.EncodedCacheKeyMultiplexProducer;
@@ -64,7 +66,9 @@ import com.facebook.imagepipeline.producers.ThumbnailBranchProducer;
 import com.facebook.imagepipeline.producers.ThumbnailProducer;
 import com.facebook.imagepipeline.producers.WebpTranscodeProducer;
 import com.facebook.imagepipeline.transcoder.ImageTranscoderFactory;
+import com.facebook.infer.annotation.Nullsafe;
 
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class ProducerFactory {
 
   private static final int MAX_SIMULTANEOUS_REQUESTS = 5;
@@ -341,11 +345,11 @@ public class ProducerFactory {
         imageTranscoderFactory);
   }
 
-  public static <T> SwallowResultProducer<T> newSwallowResultProducer(Producer<T> inputProducer) {
+  public <T> SwallowResultProducer<T> newSwallowResultProducer(Producer<T> inputProducer) {
     return new SwallowResultProducer<T>(inputProducer);
   }
 
-  public <T> ThreadHandoffProducer<T> newBackgroundThreadHandoffProducer(
+  public <T> Producer<T> newBackgroundThreadHandoffProducer(
       Producer<T> inputProducer, ThreadHandoffProducerQueue inputThreadHandoffProducerQueue) {
     return new ThreadHandoffProducer<T>(inputProducer, inputThreadHandoffProducerQueue);
   }
@@ -369,5 +373,16 @@ public class ProducerFactory {
         mBitmapPrepareToDrawMinSizeBytes,
         mBitmapPrepareToDrawMaxSizeBytes,
         mBitmapPrepareToDrawForPrefetch);
+  }
+
+  public DelayProducer newDelayProducer(
+      Producer<CloseableReference<CloseableImage>> inputProducer) {
+    return new DelayProducer(
+        inputProducer, mExecutorSupplier.scheduledExecutorServiceForBackgroundTasks());
+  }
+
+  public @Nullable Producer<EncodedImage> newCombinedNetworkAndCacheProducer(
+      final NetworkFetcher networkFetcher) {
+    return null;
   }
 }

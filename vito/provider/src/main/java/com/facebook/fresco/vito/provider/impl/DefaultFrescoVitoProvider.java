@@ -7,21 +7,37 @@
 
 package com.facebook.fresco.vito.provider.impl;
 
+import android.content.res.Resources;
+import com.facebook.callercontext.CallerContextVerifier;
 import com.facebook.common.internal.Supplier;
+import com.facebook.drawee.backends.pipeline.Fresco;
 import com.facebook.fresco.vito.core.DefaultFrescoVitoConfig;
-import com.facebook.fresco.vito.core.FrescoContext;
 import com.facebook.fresco.vito.core.FrescoController2;
 import com.facebook.fresco.vito.core.FrescoVitoConfig;
 import com.facebook.fresco.vito.core.FrescoVitoPrefetcher;
+import com.facebook.fresco.vito.core.ImagePipelineUtils;
 import com.facebook.fresco.vito.core.VitoImagePipeline;
 import com.facebook.fresco.vito.core.impl.FrescoController2Impl;
+import com.facebook.fresco.vito.core.impl.FrescoVitoPrefetcherImpl;
+import com.facebook.fresco.vito.core.impl.HierarcherImpl;
+import com.facebook.fresco.vito.core.impl.ImagePipelineUtilsImpl;
+import com.facebook.fresco.vito.core.impl.NoOpVitoImagePerfListener;
 import com.facebook.fresco.vito.core.impl.VitoImagePipelineImpl;
 import com.facebook.fresco.vito.core.impl.debug.DefaultDebugOverlayFactory2;
 import com.facebook.fresco.vito.core.impl.debug.NoOpDebugOverlayFactory2;
+import com.facebook.fresco.vito.drawable.ArrayVitoDrawableFactory;
+import com.facebook.fresco.vito.drawable.BitmapDrawableFactory;
+import com.facebook.fresco.vito.draweesupport.DrawableFactoryWrapper;
+import com.facebook.fresco.vito.options.ImageOptionsDrawableFactory;
 import com.facebook.fresco.vito.provider.FrescoVitoProvider;
+import com.facebook.imagepipeline.core.ImagePipeline;
 import com.facebook.imagepipeline.core.ImagePipelineFactory;
+import com.facebook.imagepipeline.drawable.DrawableFactory;
+import com.facebook.infer.annotation.Nullsafe;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class DefaultFrescoVitoProvider implements FrescoVitoProvider.Implementation {
 
   private FrescoController2 mFrescoController;
@@ -29,36 +45,57 @@ public class DefaultFrescoVitoProvider implements FrescoVitoProvider.Implementat
   private FrescoVitoPrefetcher mFrescoVitoPrefetcher;
   private FrescoVitoConfig mFrescoVitoConfig;
 
-  public DefaultFrescoVitoProvider() {
+  public DefaultFrescoVitoProvider(
+      final Resources resources,
+      final ImagePipeline imagePipeline,
+      final Executor lightweightBackgroundThreadExecutor,
+      final Executor uiThreadExecutor,
+      final @Nullable Supplier<Boolean> debugOverlayEnabledSupplier,
+      final Supplier<Boolean> useNativeRounding,
+      final Supplier<Boolean> useFastNativeRounding) {
     this(
-        DefaultFrescoContext.get(),
+        resources,
         new DefaultFrescoVitoConfig(),
-        DefaultFrescoContext.getDebugOverlayEnabledSupplier());
+        imagePipeline,
+        new ImagePipelineUtilsImpl(useNativeRounding, useFastNativeRounding),
+        lightweightBackgroundThreadExecutor,
+        uiThreadExecutor,
+        debugOverlayEnabledSupplier,
+        useNativeRounding,
+        new NoOpCallerContextVerifier());
   }
 
   public DefaultFrescoVitoProvider(
-      FrescoContext context,
+      Resources resources,
       FrescoVitoConfig config,
-      @Nullable Supplier<Boolean> debugOverlayEnabledSupplier) {
+      ImagePipeline imagePipeline,
+      ImagePipelineUtils imagePipelineUtils,
+      Executor lightweightBackgroundThreadExecutor,
+      Executor uiThreadExecutor,
+      @Nullable Supplier<Boolean> debugOverlayEnabledSupplier,
+      Supplier<Boolean> nativeCodeEnabledSupplier,
+      CallerContextVerifier callerContextVerifier) {
     if (!ImagePipelineFactory.hasBeenInitialized()) {
       throw new RuntimeException(
           "Fresco must be initialized before DefaultFrescoVitoProvider can be used!");
     }
     mFrescoVitoConfig = config;
-    mFrescoVitoPrefetcher = context.getPrefetcher();
-    mVitoImagePipeline =
-        new VitoImagePipelineImpl(context.getImagePipeline(), context.getImagePipelineUtils());
+    mFrescoVitoPrefetcher =
+        new FrescoVitoPrefetcherImpl(imagePipeline, imagePipelineUtils, callerContextVerifier);
+    mVitoImagePipeline = new VitoImagePipelineImpl(imagePipeline, imagePipelineUtils);
     mFrescoController =
         new FrescoController2Impl(
             mFrescoVitoConfig,
-            context.getHierarcher(),
-            context.getLightweightBackgroundThreadExecutor(),
-            context.getUiThreadExecutorService(),
+            new HierarcherImpl(createDefaultDrawableFactory(resources, nativeCodeEnabledSupplier)),
+            lightweightBackgroundThreadExecutor,
+            uiThreadExecutor,
             mVitoImagePipeline,
             null,
             debugOverlayEnabledSupplier == null
                 ? new NoOpDebugOverlayFactory2()
-                : new DefaultDebugOverlayFactory2(debugOverlayEnabledSupplier));
+                : new DefaultDebugOverlayFactory2(debugOverlayEnabledSupplier),
+            null,
+            new NoOpVitoImagePerfListener());
   }
 
   @Override
@@ -79,5 +116,16 @@ public class DefaultFrescoVitoProvider implements FrescoVitoProvider.Implementat
   @Override
   public FrescoVitoConfig getConfig() {
     return mFrescoVitoConfig;
+  }
+
+  private static ImageOptionsDrawableFactory createDefaultDrawableFactory(
+      Resources resources, Supplier<Boolean> nativeCodeEnabledSupplier) {
+    DrawableFactory animatedDrawableFactory =
+        Fresco.getImagePipelineFactory().getAnimatedDrawableFactory(null);
+    return new ArrayVitoDrawableFactory(
+        new BitmapDrawableFactory(resources, nativeCodeEnabledSupplier),
+        animatedDrawableFactory == null
+            ? null
+            : new DrawableFactoryWrapper(animatedDrawableFactory));
   }
 }

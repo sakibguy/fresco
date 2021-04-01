@@ -9,9 +9,10 @@ package com.facebook.imagepipeline.producers;
 
 import androidx.annotation.StringDef;
 import com.facebook.imagepipeline.common.Priority;
-import com.facebook.imagepipeline.core.ImagePipelineConfig;
+import com.facebook.imagepipeline.core.ImagePipelineConfigInterface;
 import com.facebook.imagepipeline.image.EncodedImageOrigin;
 import com.facebook.imagepipeline.request.ImageRequest;
+import com.facebook.infer.annotation.Nullsafe;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -26,6 +27,7 @@ import javax.annotation.Nullable;
  * runOnCancellationRequested} method which takes an instance of Runnable and executes it when the
  * pipeline client cancels the image request.
  */
+@Nullsafe(Nullsafe.Mode.STRICT)
 public interface ProducerContext {
 
   @StringDef({
@@ -33,6 +35,7 @@ public interface ProducerContext {
     ExtraKeys.ORIGIN_SUBCATEGORY,
     ExtraKeys.NORMALIZED_URI,
     ExtraKeys.SOURCE_URI,
+    ExtraKeys.IMAGE_FORMAT,
     ExtraKeys.ENCODED_WIDTH,
     ExtraKeys.ENCODED_HEIGHT,
     ExtraKeys.ENCODED_SIZE,
@@ -44,6 +47,7 @@ public interface ProducerContext {
     String ORIGIN_SUBCATEGORY = "origin_sub";
     String SOURCE_URI = "uri_source";
     String NORMALIZED_URI = "uri_norm";
+    String IMAGE_FORMAT = "image_format";
     String ENCODED_WIDTH = "encoded_width";
     String ENCODED_HEIGHT = "encoded_height";
     String ENCODED_SIZE = "encoded_size";
@@ -89,7 +93,7 @@ public interface ProducerContext {
    */
   void addCallbacks(ProducerContextCallbacks callbacks);
 
-  ImagePipelineConfig getImagePipelineConfig();
+  ImagePipelineConfigInterface getImagePipelineConfig();
 
   EncodedImageOrigin getEncodedImageOrigin();
 

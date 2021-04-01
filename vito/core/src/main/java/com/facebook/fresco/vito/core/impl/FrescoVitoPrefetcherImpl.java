@@ -8,149 +8,123 @@
 package com.facebook.fresco.vito.core.impl;
 
 import android.net.Uri;
+import com.facebook.callercontext.CallerContextVerifier;
 import com.facebook.datasource.DataSource;
 import com.facebook.datasource.DataSources;
-import com.facebook.fresco.vito.core.FrescoContext;
 import com.facebook.fresco.vito.core.FrescoVitoPrefetcher;
+import com.facebook.fresco.vito.core.ImagePipelineUtils;
 import com.facebook.fresco.vito.core.PrefetchTarget;
 import com.facebook.fresco.vito.core.VitoImageRequest;
 import com.facebook.fresco.vito.options.DecodedImageOptions;
 import com.facebook.fresco.vito.options.EncodedImageOptions;
 import com.facebook.fresco.vito.options.ImageOptions;
 import com.facebook.imagepipeline.core.ImagePipeline;
+import com.facebook.imagepipeline.listener.RequestListener;
 import com.facebook.imagepipeline.request.ImageRequest;
 import java.util.concurrent.CancellationException;
 import javax.annotation.Nullable;
 
 public class FrescoVitoPrefetcherImpl implements FrescoVitoPrefetcher {
 
-  private final FrescoContext mFrescoContext;
+  private static final Throwable NULL_IMAGE_MESSAGE =
+      new NullPointerException("No image to prefetch.");
 
-  public FrescoVitoPrefetcherImpl(FrescoContext frescoContext) {
-    mFrescoContext = frescoContext;
+  private final ImagePipeline mImagePipeline;
+  private final ImagePipelineUtils mImagePipelineUtils;
+  private final @Nullable CallerContextVerifier mCallerContextVerifier;
+
+  public FrescoVitoPrefetcherImpl(
+      ImagePipeline imagePipeline,
+      ImagePipelineUtils imagePipelineUtils,
+      @Nullable CallerContextVerifier callerContextVerifier) {
+    mImagePipeline = imagePipeline;
+    mImagePipelineUtils = imagePipelineUtils;
+    mCallerContextVerifier = callerContextVerifier;
   }
 
-  /**
-   * Prefetch an image to the given {@link PrefetchTarget}
-   *
-   * <p>Beware that if your network fetcher doesn't support priorities prefetch requests may slow
-   * down images which are immediately required on screen.
-   *
-   * @param prefetchTarget the target to prefetch to
-   * @param uri the image URI to prefetch
-   * @param imageOptions the image options used to display the image
-   * @param callerContext the caller context for the given image
-   * @return a DataSource that can safely be ignored.
-   */
+  @Override
   public DataSource<Void> prefetch(
       PrefetchTarget prefetchTarget,
       final Uri uri,
       final @Nullable ImageOptions imageOptions,
-      final @Nullable Object callerContext) {
+      final @Nullable Object callerContext,
+      final String callsite) {
     switch (prefetchTarget) {
       case MEMORY_DECODED:
-        return prefetchToBitmapCache(uri, imageOptions, callerContext);
+        return prefetchToBitmapCache(uri, imageOptions, callerContext, callsite);
       case MEMORY_ENCODED:
-        return prefetchToEncodedCache(uri, imageOptions, callerContext);
+        return prefetchToEncodedCache(uri, imageOptions, callerContext, callsite);
       case DISK:
-        return prefetchToDiskCache(uri, imageOptions, callerContext);
+        return prefetchToDiskCache(uri, imageOptions, callerContext, callsite);
     }
     return DataSources.immediateFailedDataSource(
         new CancellationException("Prefetching is not enabled"));
   }
 
-  /**
-   * Prefetch an image to the bitmap memory cache (for decoded images). In order to cancel the
-   * prefetch, close the {@link DataSource} returned by this method.
-   *
-   * <p>Beware that if your network fetcher doesn't support priorities prefetch requests may slow
-   * down images which are immediately required on screen.
-   *
-   * @param uri the image URI to prefetch
-   * @param imageOptions the image options used to display the image
-   * @param callerContext the caller context for the given image
-   * @return a DataSource that can safely be ignored.
-   */
+  @Override
   public DataSource<Void> prefetchToBitmapCache(
       final Uri uri,
       final @Nullable DecodedImageOptions imageOptions,
-      final @Nullable Object callerContext) {
-    mFrescoContext.verifyCallerContext(callerContext);
-    ImageRequest imageRequest =
-        mFrescoContext
-            .getImagePipelineUtils()
-            .buildImageRequest(uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
-    return mFrescoContext.getImagePipeline().prefetchToBitmapCache(imageRequest, callerContext);
+      final @Nullable Object callerContext,
+      final String callsite) {
+    final ImageRequest imageRequest =
+        mImagePipelineUtils.buildImageRequest(
+            uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
+    return prefetch(PrefetchTarget.MEMORY_DECODED, imageRequest, callerContext, null);
   }
 
-  /**
-   * Prefetch an image to the encoded memory cache. In order to cancel the prefetch, close the
-   * {@link DataSource} returned by this method.
-   *
-   * <p>Beware that if your network fetcher doesn't support priorities prefetch requests may slow
-   * down images which are immediately required on screen.
-   *
-   * @param uri the image URI to prefetch
-   * @param imageOptions the image options used to display the image
-   * @param callerContext the caller context for the given image
-   * @return a DataSource that can safely be ignored.
-   */
+  @Override
   public DataSource<Void> prefetchToEncodedCache(
       final Uri uri,
       final @Nullable EncodedImageOptions imageOptions,
-      final @Nullable Object callerContext) {
-    mFrescoContext.verifyCallerContext(callerContext);
-    ImageRequest imageRequest =
-        mFrescoContext
-            .getImagePipelineUtils()
-            .buildEncodedImageRequest(
-                uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
-    return mFrescoContext.getImagePipeline().prefetchToEncodedCache(imageRequest, callerContext);
+      final @Nullable Object callerContext,
+      final String callsite) {
+    final ImageRequest imageRequest =
+        mImagePipelineUtils.buildEncodedImageRequest(
+            uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
+    return prefetch(PrefetchTarget.MEMORY_ENCODED, imageRequest, callerContext, null);
   }
 
-  /**
-   * Prefetch an image to the disk cache. In order to cancel the prefetch, close the {@link
-   * DataSource} returned by this method.
-   *
-   * <p>Beware that if your network fetcher doesn't support priorities prefetch requests may slow
-   * down images which are immediately required on screen.
-   *
-   * @param uri the image URI to prefetch
-   * @param imageOptions the image options used to display the image
-   * @param callerContext the caller context for the given image
-   * @return a DataSource that can safely be ignored.
-   */
+  @Override
   public DataSource<Void> prefetchToDiskCache(
       final Uri uri,
       final @Nullable ImageOptions imageOptions,
-      final @Nullable Object callerContext) {
-    mFrescoContext.verifyCallerContext(callerContext);
-    ImageRequest imageRequest =
-        mFrescoContext
-            .getImagePipelineUtils()
-            .buildEncodedImageRequest(
-                uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
-    return mFrescoContext.getImagePipeline().prefetchToDiskCache(imageRequest, callerContext);
+      final @Nullable Object callerContext,
+      final String callsite) {
+    final ImageRequest imageRequest =
+        mImagePipelineUtils.buildEncodedImageRequest(
+            uri, imageOptions != null ? imageOptions : ImageOptions.defaults());
+    return prefetch(PrefetchTarget.DISK, imageRequest, callerContext, null);
   }
 
-  @Nullable
+  @Override
   public DataSource<Void> prefetch(
       final PrefetchTarget prefetchTarget,
       final VitoImageRequest imageRequest,
-      @Nullable final Object callerContext) {
-    final ImageRequest finalImageRequest = imageRequest.finalImageRequest;
-    if (finalImageRequest == null) {
-      return null;
+      @Nullable final Object callerContext,
+      @Nullable final RequestListener requestListener,
+      final String callsite) {
+    return prefetch(prefetchTarget, imageRequest.finalImageRequest, callerContext, requestListener);
+  }
+
+  private DataSource<Void> prefetch(
+      final PrefetchTarget prefetchTarget,
+      @Nullable final ImageRequest imageRequest,
+      @Nullable final Object callerContext,
+      @Nullable final RequestListener requestListener) {
+    if (mCallerContextVerifier != null) {
+      mCallerContextVerifier.verifyCallerContext(callerContext, false);
     }
-    mFrescoContext.verifyCallerContext(callerContext);
-    final ImagePipeline pipeline = mFrescoContext.getImagePipeline();
+    if (imageRequest == null) {
+      return DataSources.immediateFailedDataSource(NULL_IMAGE_MESSAGE);
+    }
     switch (prefetchTarget) {
       case MEMORY_DECODED:
-        return pipeline.prefetchToBitmapCache(finalImageRequest, callerContext);
+        return mImagePipeline.prefetchToBitmapCache(imageRequest, callerContext, requestListener);
       case MEMORY_ENCODED:
-        return pipeline.prefetchToEncodedCache(finalImageRequest, callerContext);
+        return mImagePipeline.prefetchToEncodedCache(imageRequest, callerContext, requestListener);
       case DISK:
-        return pipeline.prefetchToDiskCache(finalImageRequest, callerContext);
+        return mImagePipeline.prefetchToDiskCache(imageRequest, callerContext, requestListener);
     }
     return DataSources.immediateFailedDataSource(
         new CancellationException("Prefetching is not enabled"));

@@ -1,29 +1,66 @@
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+/*
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 package com.facebook.fresco.ui.common;
 
+import android.net.Uri;
+import com.facebook.infer.annotation.Nullsafe;
+import com.facebook.infer.annotation.PropagatesNullable;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 
-/* Experimental */
-@Deprecated
+@Nullsafe(Nullsafe.Mode.STRICT)
 public interface ControllerListener2<INFO> {
 
   class Extras {
-    public @Nullable Map<String, Object> pipe;
-    public @Nullable Map<String, Object> view;
+    public @Nullable Map<String, Object> componentExtras;
+    public @Nullable Map<String, Object> shortcutExtras;
+    public @Nullable Map<String, Object> datasourceExtras;
+    public @Nullable Map<String, Object> imageExtras;
 
-    public static Extras of(
-        @Nullable Map<String, Object> pipe, @Nullable Map<String, Object> view) {
+    public @Nullable Object callerContext;
+    public @Nullable Uri mainUri;
+
+    public int viewportWidth = -1;
+    public int viewportHeight = -1;
+    public @Nullable Object scaleType;
+    public float focusX = -1;
+    public float focusY = -1;
+
+    public static Extras of(@Nullable Map<String, Object> componentExtras) {
       Extras extras = new Extras();
-      extras.pipe = pipe;
-      extras.view = view;
+      extras.componentExtras = componentExtras;
       return extras;
     }
 
-    @Override
-    public String toString() {
-      return "pipe: " + pipe + ", view: " + view;
+    public Extras makeExtrasCopy() {
+      Extras extras = new Extras();
+      extras.componentExtras = copyMap(this.componentExtras);
+      extras.shortcutExtras = copyMap(this.shortcutExtras);
+      extras.datasourceExtras = copyMap(this.datasourceExtras);
+      extras.imageExtras = copyMap(this.imageExtras);
+      extras.callerContext = this.callerContext;
+      extras.mainUri = this.mainUri;
+      extras.viewportWidth = this.viewportWidth;
+      extras.viewportHeight = this.viewportHeight;
+      extras.scaleType = this.scaleType;
+      extras.focusX = this.focusX;
+      extras.focusY = this.focusY;
+
+      return extras;
+    }
+
+    private static Map<String, Object> copyMap(@PropagatesNullable Map<String, Object> map) {
+      if (map == null) {
+        return null;
+      }
+
+      return new ConcurrentHashMap<>(map);
     }
   }
 

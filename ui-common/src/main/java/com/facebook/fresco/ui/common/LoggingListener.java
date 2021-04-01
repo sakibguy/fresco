@@ -7,7 +7,12 @@
 
 package com.facebook.fresco.ui.common;
 
+import com.facebook.infer.annotation.Nullsafe;
+
+@Nullsafe(Nullsafe.Mode.STRICT)
 public interface LoggingListener {
+
+  void onFadeStarted(String id);
 
   void onFadeFinished(String id);
 }

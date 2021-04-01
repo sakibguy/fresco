@@ -394,12 +394,22 @@ public abstract class AbstractDraweeController<T, INFO>
   private void setUpLoggingListener() {
     if (mSettableDraweeHierarchy instanceof GenericDraweeHierarchy) {
       ((GenericDraweeHierarchy) mSettableDraweeHierarchy)
-          .setOnFadeFinishedListener(
-              new FadeDrawable.OnFadeFinishedListener() {
+          .setOnFadeListener(
+              new FadeDrawable.OnFadeListener() {
                 @Override
                 public void onFadeFinished() {
                   if (mLoggingListener != null) {
                     mLoggingListener.onFadeFinished(mId);
+                  }
+                }
+
+                @Override
+                public void onShownImmediately() {}
+
+                @Override
+                public void onFadeStarted() {
+                  if (mLoggingListener != null) {
+                    mLoggingListener.onFadeStarted(mId);
                   }
                 }
               });

@@ -9,9 +9,10 @@ package com.facebook.imagepipeline.producers;
 
 import com.facebook.common.internal.ImmutableSet;
 import com.facebook.imagepipeline.common.Priority;
-import com.facebook.imagepipeline.core.ImagePipelineConfig;
+import com.facebook.imagepipeline.core.ImagePipelineConfigInterface;
 import com.facebook.imagepipeline.image.EncodedImageOrigin;
 import com.facebook.imagepipeline.request.ImageRequest;
+import com.facebook.infer.annotation.Nullsafe;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +25,7 @@ import javax.annotation.concurrent.GuardedBy;
  * ProducerContext that can be cancelled. Exposes low level API to manipulate state of the
  * ProducerContext.
  */
+@Nullsafe(Nullsafe.Mode.STRICT)
 public class BaseProducerContext implements ProducerContext {
 
   private static final String ORIGIN_SUBCATEGORY_DEFAULT = "default";
@@ -53,7 +55,7 @@ public class BaseProducerContext implements ProducerContext {
   @GuardedBy("this")
   private final List<ProducerContextCallbacks> mCallbacks;
 
-  private final ImagePipelineConfig mImagePipelineConfig;
+  private final ImagePipelineConfigInterface mImagePipelineConfig;
 
   private EncodedImageOrigin mEncodedImageOrigin = EncodedImageOrigin.NOT_SET;
 
@@ -66,7 +68,7 @@ public class BaseProducerContext implements ProducerContext {
       boolean isPrefetch,
       boolean isIntermediateResultExpected,
       Priority priority,
-      ImagePipelineConfig imagePipelineConfig) {
+      ImagePipelineConfigInterface imagePipelineConfig) {
     this(
         imageRequest,
         id,
@@ -90,7 +92,7 @@ public class BaseProducerContext implements ProducerContext {
       boolean isPrefetch,
       boolean isIntermediateResultExpected,
       Priority priority,
-      ImagePipelineConfig imagePipelineConfig) {
+      ImagePipelineConfigInterface imagePipelineConfig) {
     mImageRequest = imageRequest;
     mId = id;
 
@@ -178,7 +180,7 @@ public class BaseProducerContext implements ProducerContext {
   }
 
   @Override
-  public ImagePipelineConfig getImagePipelineConfig() {
+  public ImagePipelineConfigInterface getImagePipelineConfig() {
     return mImagePipelineConfig;
   }
 
@@ -339,7 +341,7 @@ public class BaseProducerContext implements ProducerContext {
 
   @Nullable
   @Override
-  public <E> E getExtra(String key, E valueIfNotFound) {
+  public <E> E getExtra(String key, @Nullable E valueIfNotFound) {
     Object maybeValue = mExtras.get(key);
     if (maybeValue == null) {
       return valueIfNotFound;

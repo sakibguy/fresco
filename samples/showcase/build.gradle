@@ -61,7 +61,7 @@ android {
         }
         instantRunConfig {
             dimension "main"
-            minSdkVersion 21
+            minSdkVersion FrescoConfig.samplesMinSdkVersion
         }
         internal {
         }
@@ -84,14 +84,15 @@ android {
 
 dependencies {
     compileOnly Deps.jsr305
+    compileOnly Deps.inferAnnotation
+    compileOnly Deps.javaxAnnotation
 
-    implementation "androidx.appcompat:appcompat:${versions.androidx.appcompat}"
-    implementation "androidx.preference:preference:${versions.androidx.preference}"
-    implementation "androidx.recyclerview:recyclerview:${versions.androidx.recyclerview}"
-    implementation "androidx.cardview:cardview:1.0.0"
-    implementation "androidx.legacy:legacy-support-v4:1.0.0"
+    implementation SampleDeps.AndroidX.appcompat
+    implementation SampleDeps.AndroidX.preference
+    implementation SampleDeps.AndroidX.recyclerview
+    implementation SampleDeps.AndroidX.cardview
 
-    implementation "com.google.android.material:material:1.1.0-alpha03"
+    implementation SampleDeps.Google.material
     implementation Deps.Tools.Stetho.okhttp3
 
     implementation project(':animated-base')
@@ -125,8 +126,10 @@ dependencies {
 
     // Experimental Fresco Vito
     implementation project(':vito:core')
+    implementation project(':vito:init')
     implementation project(':vito:ktx')
     implementation project(':vito:litho')
+    implementation project(':vito:litho-slideshow')
     implementation project(':vito:options')
     implementation project(':vito:provider')
     implementation project(':vito:source')
@@ -135,9 +138,9 @@ dependencies {
     implementation SampleDeps.Showcase.caverockSvg
 
     // Testing-only dependencies
-    androidTestImplementation "androidx.test.espresso:espresso-core:${versions.androidx.espresso}"
-    androidTestImplementation "androidx.test:rules:${versions.androidx.test}"
-    androidTestImplementation "androidx.test:runner:${versions.androidx.test}"
+    androidTestImplementation TestDeps.AndroidX.espressoCore
+    androidTestImplementation TestDeps.AndroidX.testRules
+    androidTestImplementation TestDeps.AndroidX.testRunner
     androidTestImplementation TestDeps.junit
 
     implementation(Deps.Tools.Flipper.flipper)

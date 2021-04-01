@@ -10,10 +10,12 @@ package com.facebook.imageformat;
 import com.facebook.common.internal.Ints;
 import com.facebook.common.internal.Preconditions;
 import com.facebook.common.webp.WebpSupportStatus;
+import com.facebook.infer.annotation.Nullsafe;
 import java.io.InputStream;
 import javax.annotation.Nullable;
 
 /** Default image format checker that is able to determine all {@link DefaultImageFormats}. */
+@Nullsafe(Nullsafe.Mode.STRICT)
 public class DefaultImageFormatChecker implements ImageFormat.FormatChecker {
 
   /**
@@ -34,6 +36,12 @@ public class DefaultImageFormatChecker implements ImageFormat.FormatChecker {
           ICO_HEADER_LENGTH,
           HEIF_HEADER_LENGTH);
 
+  private boolean mUseNewOrder = false;
+
+  public void setUseNewOrder(boolean useNewOrder) {
+    mUseNewOrder = useNewOrder;
+  }
+
   @Override
   public int getHeaderSize() {
     return MAX_HEADER_LENGTH;
@@ -52,7 +60,7 @@ public class DefaultImageFormatChecker implements ImageFormat.FormatChecker {
   public final ImageFormat determineFormat(byte[] headerBytes, int headerSize) {
     Preconditions.checkNotNull(headerBytes);
 
-    if (WebpSupportStatus.isWebpHeader(headerBytes, 0, headerSize)) {
+    if (!mUseNewOrder && WebpSupportStatus.isWebpHeader(headerBytes, 0, headerSize)) {
       return getWebpFormat(headerBytes, headerSize);
     }
 
@@ -62,6 +70,10 @@ public class DefaultImageFormatChecker implements ImageFormat.FormatChecker {
 
     if (isPngHeader(headerBytes, headerSize)) {
       return DefaultImageFormats.PNG;
+    }
+
+    if (mUseNewOrder && WebpSupportStatus.isWebpHeader(headerBytes, 0, headerSize)) {
+      return getWebpFormat(headerBytes, headerSize);
     }
 
     if (isGifHeader(headerBytes, headerSize)) {

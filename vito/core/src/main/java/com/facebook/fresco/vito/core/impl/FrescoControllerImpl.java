@@ -10,11 +10,11 @@ package com.facebook.fresco.vito.core.impl;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.util.ObjectsCompat;
 import com.facebook.cache.common.CacheKey;
 import com.facebook.common.internal.ImmutableMap;
 import com.facebook.common.internal.Preconditions;
-import com.facebook.common.internal.VisibleForTesting;
 import com.facebook.common.logging.FLog;
 import com.facebook.common.references.CloseableReference;
 import com.facebook.common.util.UriUtil;
@@ -59,12 +59,11 @@ public class FrescoControllerImpl implements FrescoController {
       ImmutableMap.<String, Object>of("component_tag", "vito1");
   private static final Map<String, Object> SHORTCUT_EXTRAS =
       ImmutableMap.<String, Object>of("origin", "memory_bitmap", "origin_sub", "shortcut");
-  private static final Extras ON_SUBMIT_EXTRAS = Extras.of(null, COMPONENT_EXTRAS);
 
   private final FrescoContext mFrescoContext;
   private final DebugOverlayFactory mDebugOverlayFactory;
   private final boolean mShouldInstrumentDrawable;
-  private final ControllerListener2<ImageInfo> mControllerListener2;
+  @Nullable private final ControllerListener2<ImageInfo> mControllerListener2;
 
   public FrescoControllerImpl(
       FrescoContext frescoContext,
@@ -125,8 +124,15 @@ public class FrescoControllerImpl implements FrescoController {
     try {
       final FrescoExperiments frescoExperiments = mFrescoContext.getExperiments();
 
-      final ImageRequest imageRequest =
+      ImageRequest imageRequest =
           mFrescoContext.getImagePipelineUtils().buildImageRequest(uri, imageOptions);
+      if (frescoExperiments.allowDelay() && imageOptions.getDelayMs() > 0 && imageRequest != null) {
+        imageRequest =
+            ImageRequestBuilder.fromRequest(imageRequest)
+                .setDelayMs(imageOptions.getDelayMs())
+                .build();
+      }
+
       final CacheKey cacheKey =
           mFrescoContext.getImagePipeline().getCacheKey(imageRequest, callerContext);
       CloseableReference<CloseableImage> cachedImage = null;
@@ -189,7 +195,8 @@ public class FrescoControllerImpl implements FrescoController {
                                   frescoExperiments.onPreparePrefetchTarget(),
                                   uri,
                                   imageOptions,
-                                  callerContext);
+                                  callerContext,
+                                  "OnPrepare");
                       if (frescoExperiments.keepRefToPrefetchDatasource()) {
                         frescoState.setPrefetchDatasource(dataSource);
                       }
@@ -237,7 +244,8 @@ public class FrescoControllerImpl implements FrescoController {
     }
     Hierarcher hierarcher = mFrescoContext.getHierarcher();
     frescoState.setActualImageWrapper(
-        hierarcher.buildActualImageWrapper(frescoState.getImageOptions()));
+        hierarcher.buildActualImageWrapper(
+            frescoState.getImageOptions(), frescoState.getCallerContext()));
     frescoState.setOverlayDrawable(
         hierarcher.buildOverlayDrawable(frescoState.getResources(), frescoState.getImageOptions()));
     if (FrescoSystrace.isTracing()) {
@@ -343,7 +351,9 @@ public class FrescoControllerImpl implements FrescoController {
 
       // Check if we have a cached image in the state
       CloseableReference<CloseableImage> cachedImage = null;
-      if (experiments.checkStateCacheInAttach()) {
+      if (experiments.allowDelay() && frescoState.getImageOptions().getDelayMs() > 0) {
+        // skip cache
+      } else if (experiments.checkStateCacheInAttach()) {
         cachedImage = frescoState.getCachedImage();
         try {
           if (CloseableReference.isValid(cachedImage)) {
@@ -357,7 +367,9 @@ public class FrescoControllerImpl implements FrescoController {
       }
 
       // Check if the image is in cache now
-      if (experiments.checkCacheInAttach()) {
+      if (experiments.allowDelay() && frescoState.getImageOptions().getDelayMs() > 0) {
+        // skip cache
+      } else if (experiments.checkCacheInAttach()) {
         if (FrescoSystrace.isTracing()) {
           FrescoSystrace.beginSection("FrescoControllerImpl#onAttach->getCachedImage");
         }
@@ -685,6 +697,7 @@ public class FrescoControllerImpl implements FrescoController {
                   frescoState.getFrescoDrawable(),
                   frescoState.getResources(),
                   frescoState.getImageOptions(),
+                  frescoState.getCallerContext(),
                   result,
                   frescoState.getActualImageWrapper(),
                   wasImmediate,

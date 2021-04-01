@@ -67,7 +67,7 @@ public class ImagePipeline {
   private AtomicLong mIdCounter;
   private final Supplier<Boolean> mLazyDataSource;
   private final @Nullable CallerContextVerifier mCallerContextVerifier;
-  private final ImagePipelineConfig mConfig;
+  private final ImagePipelineConfigInterface mConfig;
 
   public ImagePipeline(
       ProducerSequenceFactory producerSequenceFactory,
@@ -83,7 +83,7 @@ public class ImagePipeline {
       Supplier<Boolean> suppressBitmapPrefetchingSupplier,
       Supplier<Boolean> lazyDataSource,
       @Nullable CallerContextVerifier callerContextVerifier,
-      ImagePipelineConfig config) {
+      ImagePipelineConfigInterface config) {
     mIdCounter = new AtomicLong();
     mProducerSequenceFactory = producerSequenceFactory;
     mRequestListener = new ForwardingRequestListener(requestListeners);
@@ -401,40 +401,44 @@ public class ImagePipeline {
    * @return a DataSource that can safely be ignored.
    */
   public DataSource<Void> prefetchToBitmapCache(ImageRequest imageRequest, Object callerContext) {
-    return prefetchToBitmapCache(imageRequest, callerContext, Priority.MEDIUM);
+    return prefetchToBitmapCache(imageRequest, callerContext, null);
   }
 
-  /** Experimental prefetch method. Do not use as it can be removed in the future */
-  @Deprecated
-  public DataSource<Void> prefetchToBitmapCacheWithHighPriority(
-      ImageRequest imageRequest, Object callerContext) {
-    return prefetchToBitmapCache(imageRequest, callerContext, Priority.HIGH);
-  }
-
-  private DataSource<Void> prefetchToBitmapCache(
-      ImageRequest imageRequest, Object callerContext, Priority priority) {
-    if (!mIsPrefetchEnabledSupplier.get()) {
-      return DataSources.immediateFailedDataSource(PREFETCH_EXCEPTION);
-    }
+  public DataSource<Void> prefetchToBitmapCache(
+      ImageRequest imageRequest, Object callerContext, @Nullable RequestListener requestListener) {
     try {
-      final Boolean shouldDecodePrefetches = imageRequest.shouldDecodePrefetches();
-      final boolean skipBitmapCache =
-          shouldDecodePrefetches != null
-              ? !shouldDecodePrefetches // use imagerequest param if specified
-              : mSuppressBitmapPrefetchingSupplier
-                  .get(); // otherwise fall back to pipeline's default
-      Producer<Void> producerSequence =
-          skipBitmapCache
-              ? mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(imageRequest)
-              : mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(imageRequest);
-      return submitPrefetchRequest(
-          producerSequence,
-          imageRequest,
-          ImageRequest.RequestLevel.FULL_FETCH,
-          callerContext,
-          priority);
-    } catch (Exception exception) {
-      return DataSources.immediateFailedDataSource(exception);
+      if (FrescoSystrace.isTracing()) {
+        FrescoSystrace.beginSection("ImagePipeline#prefetchToBitmapCache");
+      }
+
+      if (!mIsPrefetchEnabledSupplier.get()) {
+        return DataSources.immediateFailedDataSource(PREFETCH_EXCEPTION);
+      }
+      try {
+        final Boolean shouldDecodePrefetches = imageRequest.shouldDecodePrefetches();
+        final boolean skipBitmapCache =
+            shouldDecodePrefetches != null
+                ? !shouldDecodePrefetches // use imagerequest param if specified
+                : mSuppressBitmapPrefetchingSupplier
+                    .get(); // otherwise fall back to pipeline's default
+        Producer<Void> producerSequence =
+            skipBitmapCache
+                ? mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(imageRequest)
+                : mProducerSequenceFactory.getDecodedImagePrefetchProducerSequence(imageRequest);
+        return submitPrefetchRequest(
+            producerSequence,
+            imageRequest,
+            ImageRequest.RequestLevel.FULL_FETCH,
+            callerContext,
+            Priority.MEDIUM,
+            requestListener);
+      } catch (Exception exception) {
+        return DataSources.immediateFailedDataSource(exception);
+      }
+    } finally {
+      if (FrescoSystrace.isTracing()) {
+        FrescoSystrace.endSection();
+      }
     }
   }
 
@@ -451,6 +455,11 @@ public class ImagePipeline {
     return prefetchToDiskCache(imageRequest, callerContext, Priority.MEDIUM);
   }
 
+  public DataSource<Void> prefetchToDiskCache(
+      ImageRequest imageRequest, Object callerContext, @Nullable RequestListener requestListener) {
+    return prefetchToDiskCache(imageRequest, callerContext, Priority.MEDIUM, requestListener);
+  }
+
   /**
    * Submits a request for prefetching to the disk cache.
    *
@@ -463,6 +472,14 @@ public class ImagePipeline {
    */
   public DataSource<Void> prefetchToDiskCache(
       ImageRequest imageRequest, Object callerContext, Priority priority) {
+    return prefetchToDiskCache(imageRequest, callerContext, priority, null);
+  }
+
+  public DataSource<Void> prefetchToDiskCache(
+      ImageRequest imageRequest,
+      Object callerContext,
+      Priority priority,
+      @Nullable RequestListener requestListener) {
     if (!mIsPrefetchEnabledSupplier.get()) {
       return DataSources.immediateFailedDataSource(PREFETCH_EXCEPTION);
     }
@@ -474,7 +491,8 @@ public class ImagePipeline {
           imageRequest,
           ImageRequest.RequestLevel.FULL_FETCH,
           callerContext,
-          priority);
+          priority,
+          requestListener);
     } catch (Exception exception) {
       return DataSources.immediateFailedDataSource(exception);
     }
@@ -493,6 +511,11 @@ public class ImagePipeline {
     return prefetchToEncodedCache(imageRequest, callerContext, Priority.MEDIUM);
   }
 
+  public DataSource<Void> prefetchToEncodedCache(
+      ImageRequest imageRequest, Object callerContext, @Nullable RequestListener requestListener) {
+    return prefetchToEncodedCache(imageRequest, callerContext, Priority.MEDIUM, requestListener);
+  }
+
   /**
    * Submits a request for prefetching to the encoded cache.
    *
@@ -505,20 +528,39 @@ public class ImagePipeline {
    */
   public DataSource<Void> prefetchToEncodedCache(
       ImageRequest imageRequest, Object callerContext, Priority priority) {
-    if (!mIsPrefetchEnabledSupplier.get()) {
-      return DataSources.immediateFailedDataSource(PREFETCH_EXCEPTION);
-    }
+    return prefetchToEncodedCache(imageRequest, callerContext, priority, null);
+  }
+
+  public DataSource<Void> prefetchToEncodedCache(
+      ImageRequest imageRequest,
+      Object callerContext,
+      Priority priority,
+      @Nullable RequestListener requestListener) {
     try {
-      Producer<Void> producerSequence =
-          mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(imageRequest);
-      return submitPrefetchRequest(
-          producerSequence,
-          imageRequest,
-          ImageRequest.RequestLevel.FULL_FETCH,
-          callerContext,
-          priority);
-    } catch (Exception exception) {
-      return DataSources.immediateFailedDataSource(exception);
+      if (FrescoSystrace.isTracing()) {
+        FrescoSystrace.beginSection("ImagePipeline#prefetchToEncodedCache");
+      }
+
+      if (!mIsPrefetchEnabledSupplier.get()) {
+        return DataSources.immediateFailedDataSource(PREFETCH_EXCEPTION);
+      }
+      try {
+        Producer<Void> producerSequence =
+            mProducerSequenceFactory.getEncodedImagePrefetchProducerSequence(imageRequest);
+        return submitPrefetchRequest(
+            producerSequence,
+            imageRequest,
+            ImageRequest.RequestLevel.FULL_FETCH,
+            callerContext,
+            priority,
+            requestListener);
+      } catch (Exception exception) {
+        return DataSources.immediateFailedDataSource(exception);
+      }
+    } finally {
+      if (FrescoSystrace.isTracing()) {
+        FrescoSystrace.endSection();
+      }
     }
   }
 
@@ -633,6 +675,39 @@ public class ImagePipeline {
     }
     final CacheKey cacheKey = mCacheKeyFactory.getBitmapCacheKey(imageRequest, null);
     CloseableReference<CloseableImage> ref = mBitmapMemoryCache.get(cacheKey);
+    try {
+      return CloseableReference.isValid(ref);
+    } finally {
+      CloseableReference.closeSafely(ref);
+    }
+  }
+
+  /**
+   * Returns whether the image is stored in the encoded memory cache.
+   *
+   * @param uri the uri for the image to be looked up.
+   * @return true if the image was found in the encoded memory cache, false otherwise
+   */
+  public boolean isInEncodedMemoryCache(final Uri uri) {
+    if (uri == null) {
+      return false;
+    }
+    Predicate<CacheKey> encodedCachePredicate = predicateForUri(uri);
+    return mEncodedMemoryCache.contains(encodedCachePredicate);
+  }
+
+  /**
+   * Returns whether the image is stored in the encoded memory cache.
+   *
+   * @param imageRequest the imageRequest for the image to be looked up.
+   * @return true if the image was found in the encoded memory cache, false otherwise.
+   */
+  public boolean isInEncodedMemoryCache(final ImageRequest imageRequest) {
+    if (imageRequest == null) {
+      return false;
+    }
+    final CacheKey cacheKey = mCacheKeyFactory.getEncodedCacheKey(imageRequest, null);
+    CloseableReference<PooledByteBuffer> ref = mEncodedMemoryCache.get(cacheKey);
     try {
       return CloseableReference.isValid(ref);
     } finally {
@@ -863,10 +938,11 @@ public class ImagePipeline {
       ImageRequest imageRequest,
       ImageRequest.RequestLevel lowestPermittedRequestLevelOnSubmit,
       Object callerContext,
-      Priority priority) {
-    final RequestListener2 requestListener =
+      Priority priority,
+      @Nullable RequestListener requestListener) {
+    final RequestListener2 requestListener2 =
         new InternalRequestListener(
-            getRequestListenerForRequest(imageRequest, null), mRequestListener2);
+            getRequestListenerForRequest(imageRequest, requestListener), mRequestListener2);
 
     if (mCallerContextVerifier != null) {
       mCallerContextVerifier.verifyCallerContext(callerContext, true);
@@ -879,7 +955,7 @@ public class ImagePipeline {
           new SettableProducerContext(
               imageRequest,
               generateUniqueFutureId(),
-              requestListener,
+              requestListener2,
               callerContext,
               lowestPermittedRequestLevel,
               /* isPrefetch */ true,
@@ -887,7 +963,7 @@ public class ImagePipeline {
               priority,
               mConfig);
       return ProducerToDataSourceAdapter.create(
-          producerSequence, settableProducerContext, requestListener);
+          producerSequence, settableProducerContext, requestListener2);
     } catch (Exception exception) {
       return DataSources.immediateFailedDataSource(exception);
     }
@@ -946,7 +1022,7 @@ public class ImagePipeline {
     return mCacheKeyFactory;
   }
 
-  public ImagePipelineConfig getConfig() {
+  public ImagePipelineConfigInterface getConfig() {
     return mConfig;
   }
 }

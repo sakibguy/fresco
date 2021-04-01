@@ -59,12 +59,12 @@ public class DraweeView<DH extends DraweeHierarchy> extends ImageView {
     init(context);
   }
 
-  public DraweeView(Context context, AttributeSet attrs) {
+  public DraweeView(Context context, @Nullable AttributeSet attrs) {
     super(context, attrs);
     init(context);
   }
 
-  public DraweeView(Context context, AttributeSet attrs, int defStyle) {
+  public DraweeView(Context context, @Nullable AttributeSet attrs, int defStyle) {
     super(context, attrs, defStyle);
     init(context);
   }
@@ -215,7 +215,7 @@ public class DraweeView<DH extends DraweeHierarchy> extends ImageView {
    */
   @Override
   @Deprecated
-  public void setImageDrawable(Drawable drawable) {
+  public void setImageDrawable(@Nullable Drawable drawable) {
     init(getContext());
     mDraweeHolder.setController(null);
     super.setImageDrawable(drawable);

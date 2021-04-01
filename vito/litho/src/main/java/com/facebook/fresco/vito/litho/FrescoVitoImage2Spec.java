@@ -13,7 +13,9 @@ import android.net.Uri;
 import android.view.View;
 import androidx.core.util.ObjectsCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
+import com.facebook.common.callercontext.ContextChain;
 import com.facebook.datasource.DataSource;
+import com.facebook.drawee.drawable.FadeDrawable;
 import com.facebook.fresco.vito.core.FrescoDrawable2;
 import com.facebook.fresco.vito.core.PrefetchConfig;
 import com.facebook.fresco.vito.core.PrefetchTarget;
@@ -23,6 +25,8 @@ import com.facebook.fresco.vito.options.ImageOptions;
 import com.facebook.fresco.vito.provider.FrescoVitoProvider;
 import com.facebook.fresco.vito.source.ImageSource;
 import com.facebook.fresco.vito.source.ImageSourceProvider;
+import com.facebook.imagepipeline.listener.RequestListener;
+import com.facebook.infer.annotation.Nullsafe;
 import com.facebook.litho.AccessibilityRole;
 import com.facebook.litho.BoundaryWorkingRange;
 import com.facebook.litho.ComponentContext;
@@ -55,15 +59,35 @@ import com.facebook.litho.annotations.PropDefault;
 import com.facebook.litho.annotations.ResType;
 import com.facebook.litho.annotations.ShouldUpdate;
 import com.facebook.litho.annotations.State;
+import com.facebook.litho.annotations.TreeProp;
 import com.facebook.litho.utils.MeasureUtils;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 
 /** Simple Fresco Vito component for Litho */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 @MountSpec(isPureRender = true, canPreallocate = true, poolSize = 15)
 public class FrescoVitoImage2Spec {
 
-  @PropDefault protected static final float imageAspectRatio = 1f;
+  public enum Prefetch {
+    AUTO,
+    YES,
+    NO,
+    ;
+
+    public static Prefetch parsePrefetch(long value) {
+      if (value == 2) {
+        return NO;
+      }
+      if (value == 1) {
+        return YES;
+      }
+      return AUTO;
+    }
+  }
+
+  @PropDefault static final float imageAspectRatio = 1f;
+  @PropDefault static final Prefetch prefetch = Prefetch.AUTO;
 
   @OnCreateMountContent(mountingType = MountingType.DRAWABLE)
   static FrescoDrawable2 onCreateMountContent(Context c) {
@@ -110,13 +134,20 @@ public class FrescoVitoImage2Spec {
   static void onPrepare(
       ComponentContext c,
       @Prop(optional = true) final @Nullable Object callerContext,
+      @Prop(optional = true) final @Nullable Prefetch prefetch,
+      @Prop(optional = true) final @Nullable RequestListener prefetchRequestListener,
       @CachedValue VitoImageRequest imageRequest,
       Output<DataSource<Void>> prefetchDataSource) {
     PrefetchConfig config = FrescoVitoProvider.getConfig().getPrefetchConfig();
-    if (config.prefetchInOnPrepare()) {
+    if (shouldPrefetchInOnPrepare(prefetch)) {
       prefetchDataSource.set(
           FrescoVitoProvider.getPrefetcher()
-              .prefetch(config.prefetchTargetOnPrepare(), imageRequest, callerContext));
+              .prefetch(
+                  config.prefetchTargetOnPrepare(),
+                  imageRequest,
+                  callerContext,
+                  prefetchRequestListener,
+                  "OnPrepare"));
     }
   }
 
@@ -124,14 +155,27 @@ public class FrescoVitoImage2Spec {
   static void onMount(
       ComponentContext c,
       final FrescoDrawable2 frescoDrawable,
-      @Prop(optional = true) final @Nullable Object callerContext,
       @Prop(optional = true) final @Nullable ImageListener imageListener,
+      @Prop(optional = true) final @Nullable Object callerContext,
+      @Prop(optional = true) FadeDrawable.OnFadeListener onFadeListener,
       @CachedValue VitoImageRequest imageRequest,
-      @FromPrepare DataSource<Void> prefetchDataSource,
+      @FromPrepare @Nullable DataSource<Void> prefetchDataSource,
       @FromBoundsDefined Rect viewportDimensions,
-      @State final @Nullable AtomicReference<DataSource<Void>> workingRangePrefetchData) {
+      @State final @Nullable AtomicReference<DataSource<Void>> workingRangePrefetchData,
+      @TreeProp final @Nullable ContextChain contextChain) {
+    if (FrescoVitoProvider.getConfig().useBindOnly()) {
+      return;
+    }
     FrescoVitoProvider.getController()
-        .fetch(frescoDrawable, imageRequest, callerContext, imageListener, viewportDimensions);
+        .fetch(
+            frescoDrawable,
+            imageRequest,
+            callerContext,
+            contextChain,
+            imageListener,
+            onFadeListener,
+            viewportDimensions);
+    frescoDrawable.getImagePerfListener().onImageMount(frescoDrawable);
     if (prefetchDataSource != null) {
       prefetchDataSource.close();
     }
@@ -144,16 +188,26 @@ public class FrescoVitoImage2Spec {
   static void onBind(
       ComponentContext c,
       final FrescoDrawable2 frescoDrawable,
-      @Prop(optional = true) final @Nullable Object callerContext,
       @Prop(optional = true) final @Nullable ImageListener imageListener,
+      @Prop(optional = true) final @Nullable FadeDrawable.OnFadeListener onFadeListener,
+      @Prop(optional = true) final @Nullable Object callerContext,
+      @TreeProp final @Nullable ContextChain contextChain,
       @CachedValue VitoImageRequest imageRequest,
-      @FromPrepare DataSource<Void> prefetchDataSource,
+      @FromPrepare @Nullable DataSource<Void> prefetchDataSource,
       @FromBoundsDefined Rect viewportDimensions,
       @State final @Nullable AtomicReference<DataSource<Void>> workingRangePrefetchData) {
     // We fetch in both mount and bind in case an unbind event triggered a delayed release.
     // We'll only trigger an actual fetch if needed. Most of the time, this will be a no-op.
     FrescoVitoProvider.getController()
-        .fetch(frescoDrawable, imageRequest, callerContext, imageListener, viewportDimensions);
+        .fetch(
+            frescoDrawable,
+            imageRequest,
+            callerContext,
+            contextChain,
+            imageListener,
+            onFadeListener,
+            viewportDimensions);
+    frescoDrawable.getImagePerfListener().onImageBind(frescoDrawable);
     if (prefetchDataSource != null) {
       prefetchDataSource.close();
     }
@@ -166,8 +220,13 @@ public class FrescoVitoImage2Spec {
   static void onUnbind(
       ComponentContext c,
       FrescoDrawable2 frescoDrawable,
-      @FromPrepare DataSource<Void> prefetchDataSource) {
-    FrescoVitoProvider.getController().releaseDelayed(frescoDrawable);
+      @FromPrepare @Nullable DataSource<Void> prefetchDataSource) {
+    frescoDrawable.getImagePerfListener().onImageUnbind(frescoDrawable);
+    if (FrescoVitoProvider.getConfig().useBindOnly()) {
+      FrescoVitoProvider.getController().releaseImmediately(frescoDrawable);
+    } else {
+      FrescoVitoProvider.getController().releaseDelayed(frescoDrawable);
+    }
     if (prefetchDataSource != null) {
       prefetchDataSource.close();
     }
@@ -177,7 +236,11 @@ public class FrescoVitoImage2Spec {
   static void onUnmount(
       ComponentContext c,
       FrescoDrawable2 frescoDrawable,
-      @FromPrepare DataSource<Void> prefetchDataSource) {
+      @FromPrepare @Nullable DataSource<Void> prefetchDataSource) {
+    frescoDrawable.getImagePerfListener().onImageUnmount(frescoDrawable);
+    if (FrescoVitoProvider.getConfig().useBindOnly()) {
+      return;
+    }
     FrescoVitoProvider.getController().release(frescoDrawable);
     if (prefetchDataSource != null) {
       prefetchDataSource.close();
@@ -199,7 +262,8 @@ public class FrescoVitoImage2Spec {
   }
 
   @OnPopulateAccessibilityNode
-  static void onPopulateAccessibilityNode(View host, AccessibilityNodeInfoCompat node) {
+  static void onPopulateAccessibilityNode(
+      ComponentContext c, View host, AccessibilityNodeInfoCompat node) {
     node.setClassName(AccessibilityRole.IMAGE);
   }
 
@@ -220,19 +284,25 @@ public class FrescoVitoImage2Spec {
   @OnEnteredRange(name = "imagePrefetch")
   static void onEnteredWorkingRange(
       ComponentContext c,
+      @Prop(optional = true) final @Nullable Prefetch prefetch,
       @Prop(optional = true) final @Nullable Object callerContext,
       @CachedValue VitoImageRequest imageRequest,
-      @FromPrepare DataSource<Void> prefetchDataSource,
+      @FromPrepare @Nullable DataSource<Void> prefetchDataSource,
       @State final @Nullable AtomicReference<DataSource<Void>> workingRangePrefetchData) {
     if (workingRangePrefetchData == null) {
       return;
     }
     cancelWorkingRangePrefetch(workingRangePrefetchData);
     PrefetchConfig prefetchConfig = FrescoVitoProvider.getConfig().getPrefetchConfig();
-    if (prefetchConfig.prefetchWithWorkingRange()) {
+    if (shouldPrefetchWithWorkingRange(prefetch)) {
       workingRangePrefetchData.set(
           FrescoVitoProvider.getPrefetcher()
-              .prefetch(PrefetchTarget.MEMORY_DECODED, imageRequest, callerContext));
+              .prefetch(
+                  PrefetchTarget.MEMORY_DECODED,
+                  imageRequest,
+                  callerContext,
+                  null,
+                  "OnEnteredRange"));
 
       if (prefetchDataSource != null
           && prefetchConfig.cancelOnPreparePrefetchWhenWorkingRangePrefetch()) {
@@ -248,9 +318,10 @@ public class FrescoVitoImage2Spec {
   }
 
   @OnRegisterRanges
-  static void registerWorkingRanges(ComponentContext c) {
+  static void registerWorkingRanges(
+      ComponentContext c, @Prop(optional = true) final @Nullable Prefetch prefetch) {
     PrefetchConfig prefetchConfig = FrescoVitoProvider.getConfig().getPrefetchConfig();
-    if (prefetchConfig.prefetchWithWorkingRange()) {
+    if (shouldPrefetchWithWorkingRange(prefetch)) {
       FrescoVitoImage2.registerImagePrefetchWorkingRange(
           c, new BoundaryWorkingRange(prefetchConfig.prefetchWorkingRangeSize()));
     }
@@ -266,5 +337,29 @@ public class FrescoVitoImage2Spec {
       dataSource.close();
     }
     prefetchData.set(null);
+  }
+
+  static boolean shouldPrefetchInOnPrepare(@Nullable Prefetch prefetch) {
+    prefetch = prefetch == null ? Prefetch.AUTO : prefetch;
+    switch (prefetch) {
+      case YES:
+        return true;
+      case NO:
+        return false;
+      default:
+        return FrescoVitoProvider.getConfig().getPrefetchConfig().prefetchInOnPrepare();
+    }
+  }
+
+  static boolean shouldPrefetchWithWorkingRange(@Nullable Prefetch prefetch) {
+    prefetch = prefetch == null ? Prefetch.AUTO : prefetch;
+    switch (prefetch) {
+      case YES:
+        return true;
+      case NO:
+        return false;
+      default:
+        return FrescoVitoProvider.getConfig().getPrefetchConfig().prefetchWithWorkingRange();
+    }
   }
 }
