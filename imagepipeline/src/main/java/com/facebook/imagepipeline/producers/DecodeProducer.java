@@ -231,7 +231,7 @@ public class DecodeProducer implements Producer<CloseableReference<CloseableImag
     }
 
     @Override
-    public void onNewResultImpl(EncodedImage newResult, @Status int status) {
+    public void onNewResultImpl(@Nullable EncodedImage newResult, @Status int status) {
       try {
         if (FrescoSystrace.isTracing()) {
           FrescoSystrace.beginSection("DecodeProducer#onNewResultImpl");
@@ -276,7 +276,7 @@ public class DecodeProducer implements Producer<CloseableReference<CloseableImag
     }
 
     /** Updates the decode job. */
-    protected boolean updateDecodeJob(EncodedImage ref, @Status int status) {
+    protected boolean updateDecodeJob(@Nullable EncodedImage ref, @Status int status) {
       return mJobScheduler.updateJob(ref, status);
     }
 
@@ -430,6 +430,7 @@ public class DecodeProducer implements Producer<CloseableReference<CloseableImag
       String finalStr = String.valueOf(isFinal);
       if (image instanceof CloseableStaticBitmap) {
         Bitmap bitmap = ((CloseableStaticBitmap) image).getUnderlyingBitmap();
+        Preconditions.checkNotNull(bitmap);
         String sizeStr = bitmap.getWidth() + "x" + bitmap.getHeight();
         // We need this because the copyOf() utility method doesn't have a proper overload method
         // for all these parameters
@@ -520,7 +521,8 @@ public class DecodeProducer implements Producer<CloseableReference<CloseableImag
     }
 
     @Override
-    protected synchronized boolean updateDecodeJob(EncodedImage encodedImage, @Status int status) {
+    protected synchronized boolean updateDecodeJob(
+        @Nullable EncodedImage encodedImage, @Status int status) {
       if (isNotLast(status)) {
         return false;
       }
@@ -558,7 +560,8 @@ public class DecodeProducer implements Producer<CloseableReference<CloseableImag
     }
 
     @Override
-    protected synchronized boolean updateDecodeJob(EncodedImage encodedImage, @Status int status) {
+    protected synchronized boolean updateDecodeJob(
+        @Nullable EncodedImage encodedImage, @Status int status) {
       boolean ret = super.updateDecodeJob(encodedImage, status);
       if ((isNotLast(status) || statusHasFlag(status, IS_PARTIAL_RESULT))
           && !statusHasFlag(status, IS_PLACEHOLDER)

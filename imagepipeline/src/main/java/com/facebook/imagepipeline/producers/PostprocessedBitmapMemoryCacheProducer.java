@@ -17,8 +17,11 @@ import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.Postprocessor;
 import com.facebook.imagepipeline.request.RepeatedPostprocessor;
+import com.facebook.infer.annotation.Nullsafe;
+import javax.annotation.Nullable;
 
 /** Memory cache producer for the bitmap memory cache. */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class PostprocessedBitmapMemoryCacheProducer
     implements Producer<CloseableReference<CloseableImage>> {
 
@@ -110,7 +113,7 @@ public class PostprocessedBitmapMemoryCacheProducer
 
     @Override
     protected void onNewResultImpl(
-        CloseableReference<CloseableImage> newResult, @Status int status) {
+        @Nullable CloseableReference<CloseableImage> newResult, @Status int status) {
       // ignore invalid intermediate results and forward the null result if last
       if (newResult == null) {
         if (isLast(status)) {

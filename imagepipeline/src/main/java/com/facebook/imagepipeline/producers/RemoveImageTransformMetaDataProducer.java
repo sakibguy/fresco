@@ -10,6 +10,8 @@ package com.facebook.imagepipeline.producers;
 import com.facebook.common.memory.PooledByteBuffer;
 import com.facebook.common.references.CloseableReference;
 import com.facebook.imagepipeline.image.EncodedImage;
+import com.facebook.infer.annotation.Nullsafe;
+import javax.annotation.Nullable;
 
 /**
  * Remove image transform meta data producer
@@ -17,6 +19,7 @@ import com.facebook.imagepipeline.image.EncodedImage;
  * <p>Remove the {@link ImageTransformMetaData} object from the results passed down from the next
  * producer, and adds it to the result that it returns to the consumer.
  */
+@Nullsafe(Nullsafe.Mode.LOCAL)
 public class RemoveImageTransformMetaDataProducer
     implements Producer<CloseableReference<PooledByteBuffer>> {
   private final Producer<EncodedImage> mInputProducer;
@@ -40,7 +43,7 @@ public class RemoveImageTransformMetaDataProducer
     }
 
     @Override
-    protected void onNewResultImpl(EncodedImage newResult, @Status int status) {
+    protected void onNewResultImpl(@Nullable EncodedImage newResult, @Status int status) {
       CloseableReference<PooledByteBuffer> ret = null;
       try {
         if (EncodedImage.isValid(newResult)) {

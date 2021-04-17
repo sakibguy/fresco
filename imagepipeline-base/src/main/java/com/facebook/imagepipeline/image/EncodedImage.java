@@ -26,6 +26,7 @@ import com.facebook.imageutils.HeifExifUtil;
 import com.facebook.imageutils.ImageMetaData;
 import com.facebook.imageutils.JfifUtil;
 import com.facebook.imageutils.WebpUtil;
+import com.facebook.infer.annotation.FalseOnNull;
 import java.io.Closeable;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -94,7 +95,7 @@ public class EncodedImage implements Closeable {
    *
    * @param encodedImage the EncodedImage to clone
    */
-  public static @Nullable EncodedImage cloneOrNull(EncodedImage encodedImage) {
+  public static @Nullable EncodedImage cloneOrNull(@Nullable EncodedImage encodedImage) {
     return encodedImage != null ? encodedImage.cloneOrNull() : null;
   }
 
@@ -161,6 +162,10 @@ public class EncodedImage implements Closeable {
       }
     }
     return null;
+  }
+
+  public InputStream getInputStreamOrThrow() {
+    return Preconditions.checkNotNull(getInputStream());
   }
 
   /** Sets the image format */
@@ -449,6 +454,7 @@ public class EncodedImage implements Closeable {
    *
    * @return true if the encoded image is valid
    */
+  @FalseOnNull
   public static boolean isValid(@Nullable EncodedImage encodedImage) {
     return encodedImage != null && encodedImage.isValid();
   }

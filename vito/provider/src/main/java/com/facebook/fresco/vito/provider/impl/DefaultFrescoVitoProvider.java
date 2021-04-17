@@ -20,7 +20,6 @@ import com.facebook.fresco.vito.core.VitoImagePipeline;
 import com.facebook.fresco.vito.core.impl.FrescoController2Impl;
 import com.facebook.fresco.vito.core.impl.FrescoVitoPrefetcherImpl;
 import com.facebook.fresco.vito.core.impl.HierarcherImpl;
-import com.facebook.fresco.vito.core.impl.ImagePipelineUtilsImpl;
 import com.facebook.fresco.vito.core.impl.NoOpVitoImagePerfListener;
 import com.facebook.fresco.vito.core.impl.VitoImagePipelineImpl;
 import com.facebook.fresco.vito.core.impl.debug.DefaultDebugOverlayFactory2;
@@ -40,24 +39,24 @@ import javax.annotation.Nullable;
 @Nullsafe(Nullsafe.Mode.LOCAL)
 public class DefaultFrescoVitoProvider implements FrescoVitoProvider.Implementation {
 
-  private FrescoController2 mFrescoController;
-  private VitoImagePipeline mVitoImagePipeline;
-  private FrescoVitoPrefetcher mFrescoVitoPrefetcher;
-  private FrescoVitoConfig mFrescoVitoConfig;
+  private final FrescoController2 mFrescoController;
+  private final VitoImagePipeline mVitoImagePipeline;
+  private final FrescoVitoPrefetcher mFrescoVitoPrefetcher;
+  private final FrescoVitoConfig mFrescoVitoConfig;
 
   public DefaultFrescoVitoProvider(
       final Resources resources,
       final ImagePipeline imagePipeline,
       final Executor lightweightBackgroundThreadExecutor,
       final Executor uiThreadExecutor,
-      final @Nullable Supplier<Boolean> debugOverlayEnabledSupplier,
+      final ImagePipelineUtils imagePipelineUtils,
       final Supplier<Boolean> useNativeRounding,
-      final Supplier<Boolean> useFastNativeRounding) {
+      final @Nullable Supplier<Boolean> debugOverlayEnabledSupplier) {
     this(
         resources,
         new DefaultFrescoVitoConfig(),
         imagePipeline,
-        new ImagePipelineUtilsImpl(useNativeRounding, useFastNativeRounding),
+        imagePipelineUtils,
         lightweightBackgroundThreadExecutor,
         uiThreadExecutor,
         debugOverlayEnabledSupplier,

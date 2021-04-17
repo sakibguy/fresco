@@ -10,6 +10,7 @@ package com.facebook.fresco.animation.factory;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import com.facebook.cache.common.CacheKey;
+import com.facebook.common.internal.Preconditions;
 import com.facebook.common.internal.Supplier;
 import com.facebook.common.time.MonotonicClock;
 import com.facebook.fresco.animation.backend.AnimationBackend;
@@ -41,6 +42,7 @@ import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.infer.annotation.Nullsafe;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.annotation.Nullable;
 
 /** Animation factory for {@link AnimatedDrawable2}. */
 @Nullsafe(Nullsafe.Mode.LOCAL)
@@ -86,11 +88,16 @@ public class ExperimentalBitmapAnimationDrawableFactory implements DrawableFacto
 
   @Override
   public AnimatedDrawable2 createDrawable(CloseableImage image) {
+    CloseableAnimatedImage closeable = ((CloseableAnimatedImage) image);
+    AnimatedImage animatedImage = closeable.getImage();
     return new AnimatedDrawable2(
-        createAnimationBackend(((CloseableAnimatedImage) image).getImageResult()));
+        createAnimationBackend(
+            Preconditions.checkNotNull(closeable.getImageResult()),
+            animatedImage != null ? animatedImage.getAnimatedBitmapConfig() : null));
   }
 
-  private AnimationBackend createAnimationBackend(AnimatedImageResult animatedImageResult) {
+  private AnimationBackend createAnimationBackend(
+      AnimatedImageResult animatedImageResult, @Nullable Bitmap.Config animatedBitmapConig) {
     AnimatedDrawableBackend animatedDrawableBackend =
         createAnimatedDrawableBackend(animatedImageResult);
 
@@ -104,7 +111,7 @@ public class ExperimentalBitmapAnimationDrawableFactory implements DrawableFacto
     if (numberOfFramesToPrefetch > 0) {
       bitmapFramePreparationStrategy =
           new FixedNumberBitmapFramePreparationStrategy(numberOfFramesToPrefetch);
-      bitmapFramePreparer = createBitmapFramePreparer(bitmapFrameRenderer);
+      bitmapFramePreparer = createBitmapFramePreparer(bitmapFrameRenderer, animatedBitmapConig);
     }
 
     BitmapAnimationBackend bitmapAnimationBackend =
@@ -120,11 +127,12 @@ public class ExperimentalBitmapAnimationDrawableFactory implements DrawableFacto
         bitmapAnimationBackend, mMonotonicClock, mScheduledExecutorServiceForUiThread);
   }
 
-  private BitmapFramePreparer createBitmapFramePreparer(BitmapFrameRenderer bitmapFrameRenderer) {
+  private BitmapFramePreparer createBitmapFramePreparer(
+      BitmapFrameRenderer bitmapFrameRenderer, @Nullable Bitmap.Config animatedBitmapConig) {
     return new DefaultBitmapFramePreparer(
         mPlatformBitmapFactory,
         bitmapFrameRenderer,
-        Bitmap.Config.ARGB_8888,
+        animatedBitmapConig != null ? animatedBitmapConig : Bitmap.Config.ARGB_8888,
         mExecutorServiceForFramePreparing);
   }
 
