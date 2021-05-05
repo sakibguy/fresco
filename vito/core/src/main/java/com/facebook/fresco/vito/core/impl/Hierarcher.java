@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-package com.facebook.fresco.vito.core;
+package com.facebook.fresco.vito.core.impl;
 
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
@@ -14,6 +14,7 @@ import com.facebook.common.references.CloseableReference;
 import com.facebook.drawee.drawable.ForwardingDrawable;
 import com.facebook.drawee.drawable.InstrumentedDrawable;
 import com.facebook.drawee.drawable.ScaleTypeDrawable;
+import com.facebook.fresco.vito.core.BaseFrescoDrawable;
 import com.facebook.fresco.vito.options.ImageOptions;
 import com.facebook.imagepipeline.image.CloseableImage;
 import com.facebook.infer.annotation.Nullsafe;
@@ -88,7 +89,7 @@ public interface Hierarcher {
       @Nullable Object callerContext);
 
   /**
-   * Sets up the actual image drawable for a given fresco drawable.
+   * Sets up the actual image drawable for a given fresco drawable
    *
    * @return actual image drawable for given {@code closeableImage} or null
    * @param wasImmediate true if result was delivered immediately e.g. from cache. Affects the
@@ -118,16 +119,4 @@ public interface Hierarcher {
       Resources resources,
       ImageOptions imageOptions,
       @Nullable Drawable cachedOverlayDrawable);
-
-  /**
-   * Sets up the debug overlay drawable for a given fresco drawable.
-   *
-   * @param frescoDrawable the Fresco drawable to set up
-   * @param overlayDrawable a cached overlay drawable to be used instead of creating a new one
-   * @param debugOverlayDrawable a debug overlay drawable if enabled
-   */
-  void setupDebugOverlayDrawable(
-      BaseFrescoDrawable frescoDrawable,
-      @Nullable Drawable overlayDrawable,
-      @Nullable Drawable debugOverlayDrawable);
 }
