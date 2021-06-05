@@ -16,11 +16,10 @@ import com.facebook.common.references.CloseableReference;
 import com.facebook.datasource.DataSource;
 import com.facebook.datasource.DataSubscriber;
 import com.facebook.drawee.backends.pipeline.info.ImageOrigin;
-import com.facebook.drawee.backends.pipeline.info.ImageOriginUtils;
-import com.facebook.drawee.backends.pipeline.info.internal.ImagePerfControllerListener2;
 import com.facebook.drawee.components.DeferredReleaser;
 import com.facebook.drawee.drawable.ScaleTypeDrawable;
 import com.facebook.drawee.drawable.ScalingUtils;
+import com.facebook.fresco.ui.common.ControllerListener2;
 import com.facebook.fresco.vito.core.CombinedImageListener;
 import com.facebook.fresco.vito.core.FrescoDrawable2;
 import com.facebook.fresco.vito.core.NopDrawable;
@@ -29,6 +28,7 @@ import com.facebook.fresco.vito.core.VitoImageRequest;
 import com.facebook.fresco.vito.core.VitoImageRequestListener;
 import com.facebook.fresco.vito.listener.ImageListener;
 import com.facebook.imagepipeline.image.CloseableImage;
+import com.facebook.imagepipeline.image.ImageInfo;
 import com.facebook.imagepipeline.listener.BaseRequestListener;
 import com.facebook.imagepipeline.listener.RequestListener;
 import com.facebook.infer.annotation.Nullsafe;
@@ -72,7 +72,39 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
         @Override
         public void onUltimateProducerReached(
             String requestId, String producerName, boolean successful) {
-          mImageOrigin = ImageOriginUtils.mapProducerNameToImageOrigin(producerName);
+          mImageOrigin = mapProducerNameToImageOrigin(producerName);
+        }
+
+        private @ImageOrigin int mapProducerNameToImageOrigin(final String producerName) {
+          switch (producerName) {
+            case "BitmapMemoryCacheGetProducer":
+            case "BitmapMemoryCacheProducer":
+            case "PostprocessedBitmapMemoryCacheProducer":
+              return ImageOrigin.MEMORY_BITMAP;
+
+            case "EncodedMemoryCacheProducer":
+              return ImageOrigin.MEMORY_ENCODED;
+
+            case "DiskCacheProducer":
+            case "PartialDiskCacheProducer":
+              return ImageOrigin.DISK;
+
+            case "NetworkFetchProducer":
+              return ImageOrigin.NETWORK;
+
+            case "DataFetchProducer":
+            case "LocalAssetFetchProducer":
+            case "LocalContentUriFetchProducer":
+            case "LocalContentUriThumbnailFetchProducer":
+            case "LocalFileFetchProducer":
+            case "LocalResourceFetchProducer":
+            case "VideoThumbnailProducer":
+            case "QualifiedResourceFetchProducer":
+              return ImageOrigin.LOCAL;
+
+            default:
+              return ImageOrigin.UNKNOWN;
+          }
         }
       };
 
@@ -82,7 +114,7 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
 
   public FrescoDrawable2Impl(
       boolean useNewReleaseCallbacks,
-      @Nullable ImagePerfControllerListener2 imagePerfControllerListener,
+      @Nullable ControllerListener2<ImageInfo> imagePerfControllerListener,
       VitoImagePerfListener imagePerfListener) {
     mUseNewReleaseCallbacks = useNewReleaseCallbacks;
     mImageListener.setImagePerfControllerListener(imagePerfControllerListener);
