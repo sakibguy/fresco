@@ -7,6 +7,7 @@
 
 package com.facebook.fresco.vito.provider;
 
+import com.facebook.common.logging.FLog;
 import com.facebook.fresco.vito.core.FrescoController2;
 import com.facebook.fresco.vito.core.FrescoVitoConfig;
 import com.facebook.fresco.vito.core.FrescoVitoPrefetcher;
@@ -45,8 +46,27 @@ public class FrescoVitoProvider {
     return getImplementation().getConfig();
   }
 
-  public static synchronized void setImplementation(@Nullable Implementation implementation) {
+  public static synchronized void setImplementation(Implementation implementation) {
+    // We do not allow to re-initialize Vito directly.
+    // You can use #resetImplementation() if you must manually tear down Vito.
+    if (sImplementation != null) {
+      FLog.e(
+          "FrescoVitoProvider",
+          "Fresco Vito already initialized! Vito must be initialized only once.");
+    }
     sImplementation = implementation;
+  }
+
+  /**
+   * Reset the implementation. This will remove any implementation currently set up and has to be
+   * used with caution.
+   */
+  public static synchronized void resetImplementation() {
+    sImplementation = null;
+  }
+
+  public static synchronized boolean hasBeenInitialized() {
+    return sImplementation != null;
   }
 
   public static synchronized Implementation getImplementation() {
