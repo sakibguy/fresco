@@ -42,11 +42,13 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
   private static final DeferredReleaser sDeferredReleaser = DeferredReleaser.getInstance();
 
   private final boolean mUseNewReleaseCallbacks;
+  private final boolean mReleasePersistentFetchRunnable;
   private @Nullable VitoImageRequest mImageRequest;
   private @Nullable Object mCallerContext;
   private @Nullable DrawableDataSubscriber mDrawableDataSubscriber;
   private long mImageId;
   private @Nullable Object mExtras;
+  private @Nullable Runnable mPersistentFetchRunnable;
 
   private @Nullable DataSource<CloseableReference<CloseableImage>> mDataSource;
   private boolean mFetchSubmitted;
@@ -114,9 +116,11 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
 
   public FrescoDrawable2Impl(
       boolean useNewReleaseCallbacks,
+      boolean releasePersistentFetchRunnable,
       @Nullable ControllerListener2<ImageInfo> imagePerfControllerListener,
       VitoImagePerfListener imagePerfListener) {
     mUseNewReleaseCallbacks = useNewReleaseCallbacks;
+    mReleasePersistentFetchRunnable = releasePersistentFetchRunnable;
     mImageListener.setImagePerfControllerListener(imagePerfControllerListener);
     mImagePerfListener = imagePerfListener;
   }
@@ -227,6 +231,17 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
     return mImageRequest;
   }
 
+  @Override
+  @Nullable
+  public Runnable getPersistentFetchRunnable() {
+    return mPersistentFetchRunnable;
+  }
+
+  @Override
+  public void setPersistentFetchRunnable(@Nullable Runnable runnable) {
+    mPersistentFetchRunnable = runnable;
+  }
+
   public synchronized void setImageId(long imageId) {
     mImageId = imageId;
   }
@@ -262,6 +277,9 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
     if (mUseNewReleaseCallbacks && mFetchSubmitted && mDrawableDataSubscriber != null) {
       mDrawableDataSubscriber.onRelease(this);
     }
+    if (mReleasePersistentFetchRunnable) {
+      mPersistentFetchRunnable = null;
+    }
     setImageId(0);
     super.close();
     super.reset();
@@ -279,6 +297,7 @@ public class FrescoDrawable2Impl extends FrescoDrawable2
     mExtras = null;
     setOnFadeListener(null);
     mImageListener.onReset();
+    // The fetchRunnable will not be reset automatically
   }
 
   public void scheduleReleaseDelayed() {
